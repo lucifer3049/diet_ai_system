@@ -77,7 +77,6 @@ ls -Force # 查看所有檔案(含隱藏)
 # git 指令
 git init # 初始化
 git add . # 加入全部檔案
-
-
-
-
+git remote add origin https://github.com/你的帳號/diet_ai_system.git #連接遠端
+git branch -M main # 推上主分支
+git push -u origin main # 推上遠端主分支
