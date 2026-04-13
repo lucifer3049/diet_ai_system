@@ -37,9 +37,21 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # 套件
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'corsheaders',
+
+    # 自己的apps
+    'users',
+    'diary',
+    'nutrition',
+    'ai_analysis',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -103,9 +115,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'zh-hant' # 語言
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Taipei' # 時區
 
 USE_I18N = True
 
@@ -121,3 +133,24 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# REST Framework 設定
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ]
+}
+
+
+# CORS 設定
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000", # React 前端開發伺服器
+    "http://localhost:5173", # Vite 前端開發伺服器
+]
+
+# 自定義的 User 模型
+AUTH_USER_MODEL = 'users.User'

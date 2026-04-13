@@ -20,18 +20,18 @@ source venv/bin/activate
 
 
 # 安裝套件
-pip install django==5.0.6
-pip install djangorestframework==3.15.2
-pip install psycopg2-binary==2.9.9
-pip install redis==5.0.4
-pip install django-redis==5.4.0
-pip install djangorestframework-simplejwt==5.3.1
-pip install python-decouple==3.8
-pip install openai==1.35.0
-pip install google-generativeai==0.7.2
-pip install Pillow==10.3.0
-pip install django-cors-headers==4.3.1
-pip install celery==5.4.0
+pip install django==5.0.6 # Django建立
+pip install djangorestframework==3.15.2 # REST Framework 
+pip install psycopg2-binary==2.9.9 # PostgreSQL
+pip install redis==5.0.4 # Cache/非同步 提升效能
+pip install django-redis==5.4.0 # Cache/非同步 提升效能
+pip install djangorestframework-simplejwt==5.3.1 # JWT登入驗證
+pip install python-decouple==3.8 # 讀取.env
+pip install openai==1.35.0 # OpenAPI
+pip install google-generativeai==0.7.2 # GeminiAPI
+pip install Pillow==10.3.0 # 可以處理圖片
+pip install django-cors-headers==4.3.1 # 前後端分離的關鍵
+pip install celery==5.4.0 # 非同步任務處理 跑太慢的話可以避免卡住API
 
 # 產生依賴紀錄.txt
 pip freeze > requirements.txt
@@ -72,6 +72,8 @@ ls -la  # 查看資料結構
 
 # 虛擬機windows
 ls -Force # 查看所有檔案(含隱藏)
+
+exit 離開虛擬機
 
 
 # git 指令
