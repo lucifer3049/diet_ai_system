@@ -14,7 +14,7 @@
 
 ---
 
-## 功能（MVP）
+## 功能
 
 - 使用者註冊 / 登入（JWT）
 - 飲食紀錄（CRUD）
@@ -25,7 +25,7 @@
 
 ## 技術棧
 
-### Backend
+### 後端
 - Python 3.12
 - Django
 - Django REST Framework
