@@ -65,6 +65,10 @@ python manage.py startapp ai_analysis # AI 分析 app
 # 確認環境輸出結果
 python manage.py check 
 
+# 執行Migration 更新資料庫
+python manage.py makemigrations # 產生makemigrations檔案 Django讀取我的models，更新model到DB
+python manage.py migrate # 這條指令會將記錄更新到DB
+
 
 # 虛擬機Linux/Mac指令
 ls -la  # 查看資料結構
