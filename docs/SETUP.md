@@ -18,6 +18,9 @@ venv\Scripts\activate
 # MAC / Linux
 source venv/bin/activate
 
+# 啟動Django專案
+python manage.py runserver
+
 
 # 安裝套件
 pip install django==5.0.6 # Django建立
@@ -67,7 +70,10 @@ python manage.py check
 
 # 執行Migration 更新資料庫
 python manage.py makemigrations # 產生makemigrations檔案 Django讀取我的models，更新model到DB
-python manage.py migrate # 這條指令會將記錄更新到DB
+python manage.py migrate # 同步資料庫
+
+# 建立管理者帳號
+python manage.py createsuperuser
 
 
 # 虛擬機Linux/Mac指令
