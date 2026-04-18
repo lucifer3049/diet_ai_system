@@ -97,6 +97,7 @@ python manage.py runserver
 ---
 
 ## 專案結構（規劃中）
+```
 diet-ai-system/
 ├── config/                  # Django 設定中心
 │   ├── settings.py
@@ -114,7 +115,7 @@ diet-ai-system/
 ├── .env.example             # 環境變數範例
 ├── manage.py
 └── requirements.txt
-
+```
 
 # API 文件
 - drf-spectacular (OpenAPI 3.0)
