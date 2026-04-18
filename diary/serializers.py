@@ -24,8 +24,8 @@ class DiaryEntrySerializer(serializers.ModelSerializer):
         model = DiaryEntry
         fields = [
             'id', 'date', 'meal_type', 'meal_type_display',
-            'notes', 'diary_foods',
-            'total_calories', 'total_protein', 'total_cards', 'total_fat',
+            'remark', 'diary_foods',
+            'total_calories', 'total_protein', 'total_carbs', 'total_fat',
             'created_at'
         ]
 

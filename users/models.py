@@ -30,7 +30,7 @@ class User(AbstractUser):
         return f"{self.username} ({self.email})"
     
     @property
-    def bmi(self):
+    def bmi(self) -> float | None:
         """"計算BMI"""
         if self.height and self.weight:
             height_m = float(self.height) / 100 

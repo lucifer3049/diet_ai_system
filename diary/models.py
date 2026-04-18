@@ -63,6 +63,7 @@ class DiaryFood(models.Model):
     diary_entry = models.ForeignKey(DiaryEntry, on_delete=models.CASCADE, related_name='diary_foods', help_text="所屬日記")
     food = models.ForeignKey(Food, on_delete=models.CASCADE, help_text="食物") # PROTECT = 食物被日記使用時，不允許刪除食物
     amount_g = models.DecimalField(max_digits=7, decimal_places=2, help_text="食用量 (g)")
+    remark = models.TextField(blank=True, help_text="備註")
 
     class Meta:
         db_table = 'diary_foods'

@@ -35,9 +35,10 @@ pip install google-generativeai==0.7.2 # GeminiAPI
 pip install Pillow==10.3.0 # 可以處理圖片
 pip install django-cors-headers==4.3.1 # 前後端分離的關鍵
 pip install celery==5.4.0 # 非同步任務處理 跑太慢的話可以避免卡住API
+pip install drf-spectacular # 安裝 API 自動產生文件 
 
 # 產生依賴紀錄.txt
-pip freeze > requirements.txt
+pip freeze > requirements.txt # 每次安裝新套件都要執行一次，確保其他環境也可以保持一樣的環境
 
 
 # 建立django 專案
@@ -64,6 +65,9 @@ python manage.py startapp users # 使用者 app
 python manage.py startapp diary # 飲食日記 app
 python manage.py startapp nutrition # 營養分析 app
 python manage.py startapp ai_analysis # AI 分析 app
+
+# 產生 schema 檔案 (前端工程師或其他系統使用)
+python manage.py spectacular --file schema.yaml
 
 # 確認環境輸出結果
 python manage.py check 
@@ -92,3 +96,7 @@ git add . # 加入全部檔案
 git remote add origin https://github.com/你的帳號/diet_ai_system.git #連接遠端
 git branch -M main # 推上主分支
 git push -u origin main # 推上遠端主分支
+
+
+# 這一段在前端專案執行
+npx openapi-typescript-codegen --input schema.yaml --output ./src/api

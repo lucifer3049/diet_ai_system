@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'drf_spectacular',  # API文檔自動產生
 
     # 自己的apps
     'users',
@@ -148,7 +149,8 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
-    ]
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema', # 告訴 DRF 用drf-spectacular產生 schema
 }
 
 
@@ -160,3 +162,34 @@ CORS_ALLOWED_ORIGINS = [
 
 # 自定義的 User 模型
 AUTH_USER_MODEL = 'users.User'
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Diet AI System API', # API文件標題
+    'DESCRIPTION': '''
+## AI 飲食控制系統 API
+
+這個API 提供以下功能:
+- 使用者註冊 / 登入 (JWT 認證)
+- 飲食日記 CRUD
+- 食物營養資料庫
+- AI 飲食分析建議
+    ''',
+    'VERSION': '1.0.0',  # API 文件版本
+    'SERVE_INCLUDE_SCHEMA': False, # 不要在網頁上顯示文件 
+
+    'SECURITY': [{'bearerAuth': []}], # 
+    # 定義 JWT 規則
+    'COMPONENTS': {  
+        'securitySchemes': {
+            'bearerAuth': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+                'description': '輸入格式: Bearer {token}' 
+            }
+        }
+    },
+
+    'SORT_OPERATIONS': False, # 保持 URL 定義順序，不要字母排序
+    'ENUM_GENERATE_CHOICE_DESCRIPTION': True, # 自動把 choices 說明加入文件
+}
