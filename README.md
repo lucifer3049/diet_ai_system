@@ -157,7 +157,7 @@ POST   /api/diary/{id}/add-food/    ← 新增食物到日記
 - [V] 第 1 階段:專案初始化
 - [V] 第 2 階段:資料庫與Models設計
 - [V] 第 3 階段:RESTful API (DRF) + Swagger UI
-- [] 第 4 階段:AI Service Layer
+- [V] 第 4 階段:AI Service Layer
 - [] 第 5 階段：Docker
 - [] 第 6 階段：Django + Docker 整合
 - [] 第 7 階段：CI/CD (GitGub Action)

@@ -6,6 +6,19 @@ class User(AbstractUser):
     建立Django內建 User
     繼承 AbstractUser = 保留內建功能 (登入/權限) + 加自己的欄位
     """
+
+    class AIProviderChoices(models.TextChoices):
+        # 使用者選擇自己喜歡的AI模型
+        OPENAI = 'openai', 'OpenAI GPT'
+        GEMINI = 'gemini', 'Google Gemini'
+
+    preferred_ai_provider = models.CharField(
+        max_length=20, 
+        choices=AIProviderChoices.choices, 
+        default=AIProviderChoices.OPENAI, 
+        help_text="偏好的 AI 分析模型"
+    )
+
     class GoalChoices(models.TextChoices):
         LOSE_WEIGHT = 'lose_weight', '減重'
         MAINTAIN = 'maintain', '維持體重'

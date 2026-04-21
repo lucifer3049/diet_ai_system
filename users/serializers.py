@@ -40,6 +40,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'username', 'email',
             'height', 'weight', 'birth_date',
             'goal', 'daily_calorie_target', 'bmi',
+            'preferred_ai_provider', 
             'created_at'
         ]
         read_only_fields = ['id', 'username', 'created_at']

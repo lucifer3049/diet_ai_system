@@ -64,3 +64,10 @@ urlpatterns = [
 ● UserProfileView: 查看自己的帳號資訊
 
 - .as_view(): 此函數會把類別轉換成Django看得懂函數
+
+# 2026_04_19 AI功能筆記
+
+mkdir ai_analysis\services # 建立services 次檔案是為了多模型邏輯所統一管理的資料夾
+type nul > ai_analysis\services\__init__.py
+type nul > ai_analysis\services\base.py # base.py是存放多個模型的依賴
+type nul > ai_analysis\services\openai_service.py

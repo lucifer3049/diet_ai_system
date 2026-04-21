@@ -45,4 +45,5 @@ urlpatterns = [
     path('api/', include('users.urls')), 
     path('api/', include('nutrition.urls')),
     path('api/', include('diary.urls')),
+    path('api/', include('ai_analysis.urls')) # AI 路徑API
 ]
