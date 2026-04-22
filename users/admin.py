@@ -1,3 +1,17 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from .models import User
 
-# Register your models here.
+@admin.register(User)
+class CustomUserAdmin(UserAdmin):
+    list_display = ['username', 'email', 'goal', 'height', 'weight', 'is_staff']
+    list_filter = ['goal', 'is_staff', 'is_active']
+    search_fields = ['username', 'email']
+    
+    fieldsets = UserAdmin.fieldsets + (
+        ('健康資料', {
+            'fields': ('height', 'weight', 'birth_date', 'goal', 'daily_calorie_target', 'preferred_ai_provider')
+        }),
+    )
+
+

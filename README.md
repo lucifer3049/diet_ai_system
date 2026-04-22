@@ -100,17 +100,23 @@ python manage.py runserver
 ```
 diet-ai-system/
 ├── config/                  # Django 設定中心
-│   ├── settings.py
-│   ├── urls.py
-│   └── wsgi.py
+│   ├── settings
+│   │   ├── __init__.py 
+│   │   ├── base.py          # 共用設定檔
+│   │   ├── development.py   # 開發環境
+│   │   ├── production.py    # 正式環境
+│   ├── exceptions.py        # 統一錯誤訊息處理
+│   ├── urls.py              # 路由管理
+│   └── wsgi.py              # 正式環境路口   
 ├── users/                   # 使用者 app（註冊/登入/JWT）
 ├── diary/                   # 飲食日記 app（CRUD）
 ├── nutrition/               # 食物營養資料庫 app
+├── logs/                    # 開發時自動產生log
 ├── ai_analysis/             # AI 分析 app（Service Layer）
 │   └── services/
-│       ├── base.py          # 抽象介面
-│       ├── openai_service.py
-│       └── gemini_service.py
+│       ├── base.py          # 抽象介面，共用的提示詞
+│       ├── openai_service.py# OpenAI的邏輯 
+│       └── gemini_service.py# GeminiAI邏輯
 ├── docker/                  # Docker 設定（規劃中）
 ├── .env.example             # 環境變數範例
 ├── manage.py
@@ -151,6 +157,15 @@ POST   /api/diary/{id}/add-food/    ← 新增食物到日記
 
 ```
 
+# 專案架構
+mkdir config\settings 
+type nul > config\settings\__init__.py
+type nul > config\settings\base.py  # 共用環境設定 (INSTALLED_APPS、REST_FRAMEWORK 等)
+type nul > config\settings\development.py # 開發專用(DEBUG=True，詳細log，允許所有 CORS)
+type nul > config\settings\production.py # 正式環境專用(DEBUG=FALSE，安全設定，效能優化)
+
+mkdir logs  # logs 專門設定log的地方
+type nul > logs\.gitkeep
 
 
 # 開發進度

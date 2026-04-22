@@ -27,3 +27,6 @@ staticfiles/
 .idea/
 *.swp
 EOF
+
+# Logs
+logs/*.log
