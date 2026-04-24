@@ -2,12 +2,88 @@ openapi: 3.0.3
 info:
   title: Diet AI System API
   version: 1.0.0
-  description: "\n## AI 飲食控制系統 API\n\n這個API 提供以下功能:\n- 使用者註冊 / 登入 (JWT 認證)\n- 飲食日記
-    CRUD\n- 食物營養資料庫\n- AI 飲食分析建議\n    "
+  description: "\n## AI 飲食控制系統\n\n這個 API 提供以下功能：\n- 使用者註冊 / 登入（JWT 認證）\n- 飲食日記 CRUD\n-
+    食物營養資料庫\n- AI 飲食分析建議\n    "
 paths:
-  /api/auth/register/:
+  /api/v1/ai/analyze/{diary_id}/:
     post:
-      operationId: auth_register_create
+      operationId: v1_ai_analyze_create
+      description: 針對指定日誌呼叫 AI 進行營養分析，結果會存入資料庫。若已有分析結果，直接回傳不重複呼叫 AI。
+      summary: 分析飲食日誌
+      parameters:
+      - in: path
+        name: diary_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - AI 分析
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIAnalysis'
+          description: ''
+        '404':
+          description: 找不到該筆資料
+        '500':
+          description: AI 分析失敗
+  /api/v1/ai/my-analyses/:
+    get:
+      operationId: v1_ai_my_analyses_list
+      description: |-
+        GET /api/ai/my-analyses/
+        取得我所有AI分析的紀錄
+      summary: 取得我的分析紀錄
+      tags:
+      - AI 分析
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AIAnalysis'
+          description: ''
+  /api/v1/auth/login/:
+    post:
+      operationId: v1_auth_login_create
+      description: 輸入帳密，取的 access token 和 refresh token。access token 有效期限 5 分鐘。
+      summary: 登入 (取得 JWT Token)
+      tags:
+      - 認證
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/v1/auth/register/:
+    post:
+      operationId: v1_auth_register_create
       description: 建立新帳號。username 必須唯一，密碼至少 8 字元。
       summary: 使用者註冊
       tags:
@@ -49,37 +125,9 @@ paths:
           description: 註冊成功
         '400':
           description: 資料驗證失敗 (帳號重複或密碼不符)
-  /api/auth/login/:
+  /api/v1/auth/token/refresh/:
     post:
-      operationId: auth_login_create
-      description: 輸入帳密，取的 access token 和 refresh token。access token 有效期限 5 分鐘。
-      summary: 登入 (取得 JWT Token)
-      tags:
-      - 認證
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TokenObtainPair'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/TokenObtainPair'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/TokenObtainPair'
-        required: true
-      security:
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TokenObtainPair'
-          description: ''
-  /api/auth/token/refresh/:
-    post:
-      operationId: auth_token_refresh_create
+      operationId: v1_auth_token_refresh_create
       description: 用 refresh token 取的新的 access token，無須重新登入。
       summary: 刷新 Access Token
       tags:
@@ -105,13 +153,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/TokenRefresh'
           description: ''
-  /api/users/me/:
+  /api/v1/diary/:
     get:
-      operationId: users_me_retrieve
-      description: 取得目前登入使用者的完整資料，包含BMI計算結果
-      summary: 取得個人資料
+      operationId: v1_diary_list
+      summary: 日記列表
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
       tags:
-      - 使用者
+      - 飲食日記
       security:
       - jwtAuth: []
       - bearerAuth: []
@@ -120,26 +174,47 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserProfile'
+                $ref: '#/components/schemas/PaginatedDiaryEntryList'
           description: ''
-    put:
-      operationId: users_me_update
-      description: |-
-        GET/PATCH /api/users/me/
-        RetrieveUpdateAPIView = 處理讀取與更新
+    post:
+      operationId: v1_diary_create
+      summary: 新增飲食日記
       tags:
-      - 使用者
+      - 飲食日記
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserProfile'
+              $ref: '#/components/schemas/DiaryEntry'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/UserProfile'
+              $ref: '#/components/schemas/DiaryEntry'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/UserProfile'
+              $ref: '#/components/schemas/DiaryEntry'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiaryEntry'
+          description: ''
+  /api/v1/diary/{id}/:
+    get:
+      operationId: v1_diary_retrieve
+      summary: 取得單一飲食日記
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - 飲食日記
       security:
       - jwtAuth: []
       - bearerAuth: []
@@ -148,25 +223,30 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserProfile'
+                $ref: '#/components/schemas/DiaryEntry'
           description: ''
     patch:
-      operationId: users_me_partial_update
-      description: 更新身高、體重、飲食目標等資料。只需傳入要更新的欄位。
-      summary: 更新個人資料
+      operationId: v1_diary_partial_update
+      summary: 更新飲食日記
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
       tags:
-      - 使用者
+      - 飲食日記
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedUserProfile'
+              $ref: '#/components/schemas/PatchedDiaryEntry'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedUserProfile'
+              $ref: '#/components/schemas/PatchedDiaryEntry'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedUserProfile'
+              $ref: '#/components/schemas/PatchedDiaryEntry'
       security:
       - jwtAuth: []
       - bearerAuth: []
@@ -175,11 +255,56 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserProfile'
+                $ref: '#/components/schemas/DiaryEntry'
           description: ''
-  /api/foods/:
+    delete:
+      operationId: v1_diary_destroy
+      summary: 刪除日記
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - 飲食日記
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/foods/:
+    get:
+      operationId: v1_foods_list
+      description: '取得所有食物資料。支援搜尋: ?search={search_keyword}'
+      summary: 食物列表
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: 搜尋食物名稱或分類
+      tags:
+      - 食物資料庫
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFoodList'
+          description: ''
     post:
-      operationId: foods_create
+      operationId: v1_foods_create
       description: |-
         ViewSet = 把 list/create/retrieve/update/destroy 全包在一起
         一個class處理所有CRUD，這樣就不用寫多個view
@@ -208,69 +333,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Food'
           description: ''
+  /api/v1/foods/{id}/:
     get:
-      operationId: foods_list
-      description: '取得所有食物資料。支援搜尋: ?search={search_keyword}'
-      summary: 食物列表
-      parameters:
-      - in: query
-        name: search
-        schema:
-          type: string
-        description: 搜尋食物名稱或分類
-      tags:
-      - 食物資料庫
-      security:
-      - jwtAuth: []
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Food'
-          description: ''
-  /api/foods/{id}/:
-    patch:
-      operationId: foods_partial_update
-      description: |-
-        ViewSet = 把 list/create/retrieve/update/destroy 全包在一起
-        一個class處理所有CRUD，這樣就不用寫多個view
-      summary: 部分更新食物
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this 食物資料庫.
-        required: true
-      tags:
-      - 食物資料庫
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedFood'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedFood'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedFood'
-      security:
-      - jwtAuth: []
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Food'
-          description: ''
-    get:
-      operationId: foods_retrieve
+      operationId: v1_foods_retrieve
       description: |-
         ViewSet = 把 list/create/retrieve/update/destroy 全包在一起
         一個class處理所有CRUD，這樣就不用寫多個view
@@ -295,7 +360,7 @@ paths:
                 $ref: '#/components/schemas/Food'
           description: ''
     put:
-      operationId: foods_update
+      operationId: v1_foods_update
       description: |-
         ViewSet = 把 list/create/retrieve/update/destroy 全包在一起
         一個class處理所有CRUD，這樣就不用寫多個view
@@ -331,8 +396,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/Food'
           description: ''
+    patch:
+      operationId: v1_foods_partial_update
+      description: |-
+        ViewSet = 把 list/create/retrieve/update/destroy 全包在一起
+        一個class處理所有CRUD，這樣就不用寫多個view
+      summary: 部分更新食物
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 食物資料庫.
+        required: true
+      tags:
+      - 食物資料庫
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFood'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFood'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFood'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Food'
+          description: ''
     delete:
-      operationId: foods_destroy
+      operationId: v1_foods_destroy
       description: |-
         ViewSet = 把 list/create/retrieve/update/destroy 全包在一起
         一個class處理所有CRUD，這樣就不用寫多個view
@@ -352,39 +453,13 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/diary/:
-    post:
-      operationId: diary_create
-      summary: 新增飲食日記
-      tags:
-      - 飲食日記
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DiaryEntry'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/DiaryEntry'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/DiaryEntry'
-        required: true
-      security:
-      - jwtAuth: []
-      - bearerAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DiaryEntry'
-          description: ''
+  /api/v1/users/me/:
     get:
-      operationId: diary_list
-      summary: 日記列表
+      operationId: v1_users_me_retrieve
+      description: 取得目前登入使用者的完整資料，包含BMI計算結果
+      summary: 取得個人資料
       tags:
-      - 飲食日記
+      - 使用者
       security:
       - jwtAuth: []
       - bearerAuth: []
@@ -393,86 +468,26 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/DiaryEntry'
-          description: ''
-  /api/diary/{id}/:
-    patch:
-      operationId: diary_partial_update
-      summary: 更新飲食日記
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
-      tags:
-      - 飲食日記
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedDiaryEntry'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedDiaryEntry'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedDiaryEntry'
-      security:
-      - jwtAuth: []
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DiaryEntry'
-          description: ''
-    get:
-      operationId: diary_retrieve
-      summary: 取得單一飲食日記
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
-      tags:
-      - 飲食日記
-      security:
-      - jwtAuth: []
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DiaryEntry'
+                $ref: '#/components/schemas/UserProfile'
           description: ''
     put:
-      operationId: diary_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
+      operationId: v1_users_me_update
+      description: |-
+        GET/PATCH /api/users/me/
+        RetrieveUpdateAPIView = 處理讀取與更新
       tags:
-      - 飲食日記
+      - 使用者
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DiaryEntry'
+              $ref: '#/components/schemas/UserProfile'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/DiaryEntry'
+              $ref: '#/components/schemas/UserProfile'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/DiaryEntry'
-        required: true
+              $ref: '#/components/schemas/UserProfile'
       security:
       - jwtAuth: []
       - bearerAuth: []
@@ -481,50 +496,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DiaryEntry'
+                $ref: '#/components/schemas/UserProfile'
           description: ''
-    delete:
-      operationId: diary_destroy
-      summary: 刪除日記
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
+    patch:
+      operationId: v1_users_me_partial_update
+      description: 更新身高、體重、飲食目標等資料。只需傳入要更新的欄位。
+      summary: 更新個人資料
       tags:
-      - 飲食日記
-      security:
-      - jwtAuth: []
-      - bearerAuth: []
-      responses:
-        '204':
-          description: No response body
-  /api/diary/{id}/add-food/:
-    post:
-      operationId: diary_add_food_create
-      description: 指定食物ID和克數，新增這筆日記中。系統會自動重新計算營養總和。
-      summary: 新增食物到日記
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
-      tags:
-      - 飲食日記
+      - 使用者
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddFoodToDiary'
+              $ref: '#/components/schemas/PatchedUserProfile'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/AddFoodToDiary'
+              $ref: '#/components/schemas/PatchedUserProfile'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/AddFoodToDiary'
-        required: true
+              $ref: '#/components/schemas/PatchedUserProfile'
       security:
       - jwtAuth: []
       - bearerAuth: []
@@ -533,27 +523,66 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DiaryEntry'
+                $ref: '#/components/schemas/UserProfile'
           description: ''
-        '400':
-          description: food_id 或 amount_g 格式錯誤
-        '404':
-          description: 找不到指定食物
 components:
   schemas:
-    AddFoodToDiary:
+    AIAnalysis:
       type: object
-      description: 新增食物到日記的 Serializer
       properties:
-        food_id:
+        id:
           type: integer
-        amount_g:
+          readOnly: true
+        diary_entry:
+          type: integer
+          description: 一筆紀錄只對應一份 AI 分析結果
+        summary:
           type: string
-          format: decimal
-          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          description: AI 分析結果
+        suggestions:
+          description: AI 分析建議
+        nutrition_score:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+          description: 營養評分 1-100
+        status:
+          allOf:
+          - $ref: '#/components/schemas/AIAnalysisStatusEnum'
+          description: |-
+            狀態
+
+            * `pending` - 待分析
+            * `processing` - 分析中
+            * `completed` - 完成
+            * `failed` - 失敗
+        ai_model_used:
+          type: string
+          description: 使用的 AI 模型(gpt-4o / gemini-pro)
+          maxLength: 50
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
       required:
-      - amount_g
-      - food_id
+      - ai_model_used
+      - created_at
+      - diary_entry
+      - id
+      - summary
+    AIAnalysisStatusEnum:
+      enum:
+      - pending
+      - processing
+      - completed
+      - failed
+      type: string
+      description: |-
+        * `pending` - 待分析
+        * `processing` - 分析中
+        * `completed` - 完成
+        * `failed` - 失敗
     CategoryEnum:
       enum:
       - grain
@@ -576,9 +605,6 @@ components:
         * `other` - 其他
     DiaryEntry:
       type: object
-      description: |-
-        食物日記主體排序
-        diary_foods = 巢狀排序 (一筆日記包含多項食物明細)
       properties:
         id:
           type: integer
@@ -600,78 +626,123 @@ components:
         meal_type_display:
           type: string
           readOnly: true
+        food_name:
+          type: string
+          description: 食物名稱，例如:雞腿便當、綠茶
+          maxLength: 200
+        portion_description:
+          type: string
+          description: 分量描述，例如:一碗、半碗、一杯
+          maxLength: 200
+        image:
+          type: string
+          format: uri
+          nullable: true
+          description: 食物照片(AI辨識使用)
         remark:
           type: string
           description: 備註
-        diary_foods:
-          type: array
-          items:
-            $ref: '#/components/schemas/DiaryFood'
-          readOnly: true
-        total_calories:
+        calories:
           type: string
           format: decimal
           pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
           readOnly: true
-          description: 總熱量 (kcal)
-        total_protein:
+          nullable: true
+          description: AI分析熱量 (kcal)
+        protein:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI分析蛋白質 (g)
+        fat:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI分析脂肪 (g)
+        saturated_fat:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI分析飽和脂肪 (g)
+        trans_fat:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI分析反式脂肪 (g)
+        carbohydrates:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI分析碳水化合物 (g)
+        sugar:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI分析糖 (g)
+        sodium:
           type: string
           format: decimal
           pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
           readOnly: true
-          description: 總蛋白質 (g)
-        total_carbs:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          nullable: true
+          description: AI分析納 (g)
+        status:
+          allOf:
+          - $ref: '#/components/schemas/DiaryEntryStatusEnum'
           readOnly: true
-          description: 總碳水化合物 (g)
-        total_fat:
+          description: |-
+            AI分析狀態
+
+            * `pending` - 等待分析
+            * `completed` - 分析完成
+            * `failed` - 分析失敗
+        status_display:
           type: string
-          format: decimal
-          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
           readOnly: true
-          description: 總脂肪 (g)
         created_at:
           type: string
           format: date-time
           readOnly: true
           description: 建立時間
       required:
+      - calories
+      - carbohydrates
       - created_at
       - date
-      - diary_foods
+      - fat
+      - food_name
       - id
       - meal_type
       - meal_type_display
-      - total_calories
-      - total_carbs
-      - total_fat
-      - total_protein
-    DiaryFood:
-      type: object
-      description: 日記的每項食物的排序
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        food:
-          type: integer
-          description: 食物
-        food_detail:
-          allOf:
-          - $ref: '#/components/schemas/Food'
-          readOnly: true
-        amount_g:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
-          description: 食用量 (g)
-      required:
-      - amount_g
-      - food
-      - food_detail
-      - id
+      - protein
+      - saturated_fat
+      - sodium
+      - status
+      - status_display
+      - sugar
+      - trans_fat
+    DiaryEntryStatusEnum:
+      enum:
+      - pending
+      - completed
+      - failed
+      type: string
+      description: |-
+        * `pending` - 等待分析
+        * `completed` - 分析完成
+        * `failed` - 分析失敗
     Food:
       type: object
       properties:
@@ -756,11 +827,54 @@ components:
         * `lunch` - 午餐
         * `dinner` - 晚餐
         * `snack` - 點心
+    PaginatedDiaryEntryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiaryEntry'
+    PaginatedFoodList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Food'
     PatchedDiaryEntry:
       type: object
-      description: |-
-        食物日記主體排序
-        diary_foods = 巢狀排序 (一筆日記包含多項食物明細)
       properties:
         id:
           type: integer
@@ -782,38 +896,91 @@ components:
         meal_type_display:
           type: string
           readOnly: true
+        food_name:
+          type: string
+          description: 食物名稱，例如:雞腿便當、綠茶
+          maxLength: 200
+        portion_description:
+          type: string
+          description: 分量描述，例如:一碗、半碗、一杯
+          maxLength: 200
+        image:
+          type: string
+          format: uri
+          nullable: true
+          description: 食物照片(AI辨識使用)
         remark:
           type: string
           description: 備註
-        diary_foods:
-          type: array
-          items:
-            $ref: '#/components/schemas/DiaryFood'
-          readOnly: true
-        total_calories:
+        calories:
           type: string
           format: decimal
           pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
           readOnly: true
-          description: 總熱量 (kcal)
-        total_protein:
+          nullable: true
+          description: AI分析熱量 (kcal)
+        protein:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI分析蛋白質 (g)
+        fat:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI分析脂肪 (g)
+        saturated_fat:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI分析飽和脂肪 (g)
+        trans_fat:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI分析反式脂肪 (g)
+        carbohydrates:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI分析碳水化合物 (g)
+        sugar:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI分析糖 (g)
+        sodium:
           type: string
           format: decimal
           pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
           readOnly: true
-          description: 總蛋白質 (g)
-        total_carbs:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          nullable: true
+          description: AI分析納 (g)
+        status:
+          allOf:
+          - $ref: '#/components/schemas/DiaryEntryStatusEnum'
           readOnly: true
-          description: 總碳水化合物 (g)
-        total_fat:
+          description: |-
+            AI分析狀態
+
+            * `pending` - 等待分析
+            * `completed` - 分析完成
+            * `failed` - 分析失敗
+        status_display:
           type: string
-          format: decimal
-          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
           readOnly: true
-          description: 總脂肪 (g)
         created_at:
           type: string
           format: date-time
@@ -928,13 +1095,29 @@ components:
           type: number
           format: double
           nullable: true
-          description: '"計算BMI'
+          description: '"計算BMI，暫存資料不存入資料庫，類似Odoo的compute'
           readOnly: true
+        preferred_ai_provider:
+          allOf:
+          - $ref: '#/components/schemas/PreferredAiProviderEnum'
+          description: |-
+            偏好的AI模型提供者
+
+            * `openai` - OpenAI GPT
+            * `gemini` - Google Gemini
         created_at:
           type: string
           format: date-time
           readOnly: true
           description: 建立時間
+    PreferredAiProviderEnum:
+      enum:
+      - openai
+      - gemini
+      type: string
+      description: |-
+        * `openai` - OpenAI GPT
+        * `gemini` - Google Gemini
     Register:
       type: object
       description: |-
@@ -990,7 +1173,6 @@ components:
           readOnly: true
         refresh:
           type: string
-          writeOnly: true
       required:
       - access
       - refresh
@@ -1049,8 +1231,16 @@ components:
           type: number
           format: double
           nullable: true
-          description: '"計算BMI'
+          description: '"計算BMI，暫存資料不存入資料庫，類似Odoo的compute'
           readOnly: true
+        preferred_ai_provider:
+          allOf:
+          - $ref: '#/components/schemas/PreferredAiProviderEnum'
+          description: |-
+            偏好的AI模型提供者
+
+            * `openai` - OpenAI GPT
+            * `gemini` - Google Gemini
         created_at:
           type: string
           format: date-time

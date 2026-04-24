@@ -1,5 +1,5 @@
 from decouple import config
-from .base import BaseAIService, AnalysisResult
+from .base import BaseAIService, NutritionAnalysisResult, DietaryAdviceResult
 from .openai_service import OpenAIService
 from .gemini_service import GeminiService
 
@@ -30,4 +30,4 @@ def get_ai_service(provider: str = None) -> BaseAIService:
 
     return service_class()
 
-__all__ = ['get_ai_service', 'BaseAIService', 'AnalysisResult']
+__all__ = ['get_ai_service', 'BaseAIService', 'NutritionAnalysisResult', 'DietaryAdviceResult']

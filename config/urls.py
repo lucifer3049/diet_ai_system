@@ -42,8 +42,8 @@ urlpatterns = [
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
     # 內部API 
-    path('api/', include('users.urls')), 
-    path('api/', include('nutrition.urls')),
-    path('api/', include('diary.urls')),
-    path('api/', include('ai_analysis.urls')) # AI 路徑API
+    path('api/v1/', include('users.urls')), 
+    path('api/v1/', include('nutrition.urls')),
+    path('api/v1/', include('diary.urls')),
+    path('api/v1/', include('ai_analysis.urls')) # AI 路徑API
 ]

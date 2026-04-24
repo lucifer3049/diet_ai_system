@@ -2,7 +2,7 @@ import json
 import logging
 import google.generativeai as genai
 from decouple import config
-from .base import BaseAIService, AnalysisResult
+from .base import BaseAIService, NutritionAnalysisResult, DietaryAdviceResult
 
 logger = logging.getLogger(__name__)
 
@@ -20,35 +20,59 @@ class GeminiService(BaseAIService):
                 "temperature": 0.7,
             }
         )
-
-    def analyze_diet(self, diary_data: dict, user_data: dict) -> AnalysisResult:
-        prompt = self._build_prompt(diary_data, user_data)
-
+    
+    def _call_api(self, prompt: str) -> str:
+        """統一 API 呼叫方法，方便未來如果要換模型或調整參數，只需要修改這裡"""
+        response = self.model.generate_content(prompt)
+        return response.text
+    
+    def analyze_food_nutrition(self, food_name: str, portion_description: str = '') -> NutritionAnalysisResult:
+        prompt = self._build_nutrition_prompt(food_name, portion_description)
+        
         try:
-            logger.info("呼叫 Gemini API")
-
-            response = self.model.generate_content(prompt)
-            raw_text = response.text
+            logger.info(f"Gemini 分析食物營養: {food_name}")
+            raw_text = self._call_api(prompt)
             parsed = json.loads(raw_text)
 
-            return AnalysisResult(
-                summary=parsed.get('summary', ''),
-                suggestions=parsed.get('suggestions', []),
-                nutrition_score=int(parsed.get('nutrition_score', 70)),
+            return NutritionAnalysisResult(
+                calories=float(parsed.get('calories', 0)),
+                protein=float(parsed.get('protein', 0)),
+                fat=float(parsed.get('fat', 0)),
+                saturated_fat=float(parsed.get('saturated_fat', 0)),
+                trans_fat=float(parsed.get('trans_fat', 0)),
+                carbohydrates=float(parsed.get('carbohydrates', 0)),
+                sugar=float(parsed.get('sugar', 0)),
+                sodium=float(parsed.get('sodium', 0)),
+                food_description=parsed.get('food_description', ''),
                 raw_response=raw_text
             )
-        
         except json.JSONDecodeError as e:
-            logger.error(f"Gemini 回應 JSON 解析失敗: {e}")
-
-            return AnalysisResult(
-                summary="分析完成，但結果格式異常",
-                suggestions=["請重新嘗試分析"],
-                nutrition_score=0,
-                raw_response=str(e)
-            )
+            logger.error(f"Gemini 營養分析 JSON 解析失敗: {e}")
+            raise
         except Exception as e:
             logger.error(f"Gemini API 呼叫失敗: {e}")
             raise
 
+    def give_dietary_advice(self, diary_entry_data: dict, user_profile: dict, daily_needs: dict) -> DietaryAdviceResult:
+        prompt = self._build_advice_prompt(diary_entry_data, user_profile, daily_needs)
+
+        try:
+            logger.info(f"Gemini 給予飲食建議")
+            raw_text = self._call_api(prompt)
+            parsed = json.loads(raw_text)
+
+            return DietaryAdviceResult(
+                summary=parsed.get('summary', ''),
+                exceeded_nutrients=parsed.get('exceeded_nutrients', []),
+                lacking_nutrients=parsed.get('lacking_nutrients', []),
+                next_meal_suggestions=parsed.get('next_meal_suggestions', []),
+                nutrition_score=int(parsed.get('nutrition_score', 70)),
+                raw_response=raw_text
+            )
+        except json.JSONDecodeError as e:
+            logger.error(f"Gemini 建議 JSON 解析失敗: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Gemini API 呼叫失敗: {e}")
+            raise
         

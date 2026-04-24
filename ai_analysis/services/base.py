@@ -1,106 +1,124 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+@dataclass
+class NutritionAnalysisResult:
+    """AI 分析食物營養結果"""
+    calories: float
+    protein: float
+    fat: float
+    saturated_fat: float
+    trans_fat: float
+    carbohydrates: float
+    sugar: float
+    sodium: float
+    food_description: str # AI 生成的食物描述
+    raw_response: str
+
 
 @dataclass
-class AnalysisResult:
-    """
-    AI 分析結果的資料結構
-    dataclass : 自動產生 __init__、__repr__等方法的 class
-    統一 OpenAI 和 Gemini 的回傳格式
-    """
-
-    summary: str # 整體分析摘要
-    suggestions: list # 建議飲食
+class DietaryAdviceResult:
+    """AI 營養師建議的結果"""
+    summary: str    # 這餐整題評價
+    exceeded_nutrients: list # 攝取過多的營養素
+    lacking_nutrients: list # 攝取不足的營養素
+    next_meal_suggestions: list # 下一餐建議餐食
     nutrition_score: int # 營養評分
-    raw_response: str # AI 原始的回應 debug使用
+    raw_response: str
 
 
 class BaseAIService(ABC):
-    """
-    抽象基底 class
-    ABC: Abstract Base Class，不能直接使用，只能被繼承
-
-    為什麼用抽象 class
-    1. 強迫所有class 都要實作 analyze_diet 方法
-    2. 確保介面一致，View 呼叫時不需要知道底層用那個AI
-    """
 
     @abstractmethod
-    def analyze_diet(self, diary_data: dict, user_data: dict) -> AnalysisResult:
+    def analyze_food_nutrition(
+        self,
+        food_name: str,
+        portion_description: str = ''
+    ) -> NutritionAnalysisResult:
         """
-        分析飲食紀錄
-
-        Args:
-            diary_data: 飲食資料(餐別、食物、營養總量)
-            user_data: 使用者記錄(身高、體重、木鰾)
-
-        Returns:
-            AnalysisResult: 統一格式的分析結果
+        分析食物營養素
+        輸入:食物名稱 + 份量描述
+        輸出:完整營養素數據
         """
         pass
 
-    def _build_prompt(self, diary_data: dict, user_data: dict) -> str:
+    @abstractmethod
+    def give_dietary_advice(
+        self,
+        diary_entry_data: dict,
+        user_profile: dict,
+        daily_needs: dict
+    ) -> DietaryAdviceResult:
         """
-        建立AI的prompt(提示詞)
-
-        為了讓 OpenAi 和 Gemini 用一樣的提示詞，就不需要重複寫了
+        根據這餐的營養素 + 使用者資料 給出建議
         """
+        pass
 
-        meal_type_map = {
-            'breakfast': '早餐',
-            'lunch': '午餐',
-            'dinner': '晚餐',
-            'snack': '點心',
-        }
+    def _build_nutrition_prompt(self, food_name: str, portion_description: str) -> str:
+        portion_text = f"，份量：{portion_description}" if portion_description else ""
+        return f"""你是一位專業的營養師和食品分析師。
+請分析以下食物的營養成分，給出最接近真實的估算值。
 
-        foods_text = '\n'.join([
-            f" - {item['food_name']} {item['amount_g']}g"
-            for item in diary_data.get('foods', [])
-        ])
+食物:{food_name}{portion_text}
 
-        user_info = f"""
-使用者資訊:
-- 身高 : {user_data.get('height', '未提供')} CM
-- 體重 : {user_data.get('weight', '未提供')} KG
-- BMI : {user_data.get('bmi', '未提供')} 
-- 飲食目標 : {user_data.get('goal', '維持體重')}
-- 每日熱量目標 : {user_data.get('daily_calorie_target', '未提供')} kcal
-"""
-        
-        prompt = f"""你是一位專業的營養師，請根據以下飲食紀錄給予專業分析和建議。
-        
-{user_info}
-
-飲食紀錄: 
-餐別: {meal_type_map.get(diary_data.get('meal_type', ''), '未知')}
-日期: {diary_data.get('date', '未知')}
-
-食物清單:
-{foods_text}
-
-營養攝取總量:
-- 熱量: {diary_data.get('total_calories', 0)} kcal
-- 蛋白質: {diary_data.get('total_protein', 0)} g
-- 碳水化合物(醣類): {diary_data.get('total_carbs', 0)} g
-- 脂肪: {diary_data.get('total_fat', 0)} g
-- 膳食纖維: {diary_data.get('total_fiber', 0)} g
-
-請用以下 JSON 格式回應 (只回應 JSON， 不要回應其他文字):
+請嚴格用以下 JSON 格式回覆（只回覆 JSON):
 {{
-    "summary": "整體飲食分析摘要,
-    "suggestions": [
-        "具體建議 1",
-        "具體建議 2",
-        "具體建議 3"
-    ],
-    "nutrition_score": 85
-}}
+    "calories": 熱量數字(kcal),
+    "protein": 蛋白質公克數(g),
+    "fat": 總脂肪公克數(g),
+    "saturated_fat": 飽和脂肪公克數(g),
+    "trans_fat": 反式脂肪公克數(g),
+    "carbohydrates": 碳水化合物公克數(g),
+    "sugar": 糖公克數(g),
+    "sodium": 鈉毫克數(mg),
+    "food_description": "對這個食物的簡短描述，包含份量估算"
+}}"""
 
-評分標準:
-- 90-100:營養非常均衡
-- 70-89:大致良好，有小幅改善空間
-- 50-69:有改善空間
-- 50以下:兄弟你還好嗎?
-        """
-        return prompt
+    def _build_advice_prompt(
+        self,
+        diary_entry_data: dict,
+        user_profile: dict,
+        daily_needs: dict
+    ) -> str:
+        return f"""你是一位專業的營養師，請根據以下資訊給予飲食建議。
+
+使用者資料:
+- 性別:{user_profile.get('gender', '未提供')}
+- 年齡:{user_profile.get('age', '未提供')} 歲
+- 身高:{user_profile.get('height', '未提供')} 公分
+- 體重:{user_profile.get('weight', '未提供')} 公斤
+- BMI:{user_profile.get('bmi', '未提供')}
+- 飲食目標:{user_profile.get('goal', '維持體重')}
+
+每日建議攝取量:
+- 熱量:{daily_needs.get('calories', '未知')} 大卡
+- 蛋白質:{daily_needs.get('protein', '未知')} 克
+- 脂肪:{daily_needs.get('fat', '未知')} 克
+- 碳水化合物:{daily_needs.get('carbohydrates', '未知')} 克
+- 鈉:{daily_needs.get('sodium', '未知')} 毫克
+
+這餐內容:
+- 食物:{diary_entry_data.get('food_name')}
+- 時段:{diary_entry_data.get('meal_type')}
+- 熱量:{diary_entry_data.get('calories')} 大卡
+- 蛋白質:{diary_entry_data.get('protein')} 克
+- 脂肪:{diary_entry_data.get('fat')} 克
+- 飽和脂肪:{diary_entry_data.get('saturated_fat')} 克
+- 反式脂肪:{diary_entry_data.get('trans_fat')} 克
+- 碳水化合物:{diary_entry_data.get('carbohydrates')} 克
+- 糖:{diary_entry_data.get('sugar')} 克
+- 鈉:{diary_entry_data.get('sodium')} 毫克
+
+請用以下 JSON 格式回覆（只回覆 JSON):
+{{
+    "summary": "這餐的整體評價(2-3句話)",
+    "exceeded_nutrients": ["攝取過多的營養素1", "攝取過多的營養素2"],
+    "lacking_nutrients": ["缺少的營養素1", "缺少的營養素2"],
+    "next_meal_suggestions": [
+        "具體的下一餐建議1",
+        "具體的下一餐建議2",
+        "具體的下一餐建議3"
+    ],
+    "nutrition_score": 評分數字
+}}"""
+    
