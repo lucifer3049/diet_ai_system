@@ -13,8 +13,9 @@ class GeminiService(BaseAIService):
 
     def __init__(self):
         genai.configure(api_key=config('GEMINI_API_KEY'))
+        self.model_name = config('GEMINI_MODEL', default='gemini-2.0-flash')
         self.model = genai.GenerativeModel(
-            model_name=config('GEMINI_MODEL', default='gemini-1.5-flash'),
+            model_name=self.model_name,
             generation_config={
                 "response_mime_type": "application/json", # 回傳格式 JSON
                 "temperature": 0.7,

@@ -14,6 +14,11 @@ class DiaryEntry(models.Model):
         LUNCH = 'lunch', '午餐'
         DINNER = 'dinner', '晚餐'
         SNACK = 'snack', '點心'
+    
+    class StatusChoices(models.TextChoices):
+        PENDING = 'pending', '等待分析'
+        COMPLETED = 'completed', '分析完成'
+        FAILED = 'failed', '分析失敗'
 
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='diary_entries', help_text="使用者")
@@ -40,12 +45,6 @@ class DiaryEntry(models.Model):
     remark = models.TextField(blank=True, help_text="備註")
 
 
-    class StatusChoices(models.TextChoices):
-        PENDING = 'pending', '等待分析'
-        COMPLETED = 'completed', '分析完成'
-        FAILED = 'failed', '分析失敗'
-
-
     status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.PENDING, help_text="AI分析狀態")
 
     class Meta:
@@ -56,20 +55,3 @@ class DiaryEntry(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.date} - {self.get_meal_type_display()}"
     
-    def calculate_totals(self):
-        """重新計算日記的營養總和，回存DB"""
-
-        totals = {'calories': 0 , 'protein': 0, 'carbs': 0, 'fat': 0, 'fiber': 0}
-        for diary_food in self.diary_foods.all():
-            nutrition = diary_food.food.get_nutrition_for_amount(float(diary_food.amount_g))
-
-            for key in totals:
-                totals[key] += nutrition[key]
-
-        self.total_calories = totals['calories']
-        self.total_protein = totals['protein']
-        self.total_carbs = totals['carbs']
-        self.total_fat = totals['fat']
-        self.total_fiber = totals['fiber']
-        self.save(update_fields=['total_calories', 'total_protein', 'total_carbs', 'total_fat', 'total_fiber'])
-

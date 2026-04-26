@@ -21,10 +21,12 @@ class AIAnalysis(models.Model):
 
     summary = models.TextField(help_text="AI 分析結果")
     suggestions = models.JSONField(default=list, help_text="AI 分析建議")
+    exceeded_nutrients = models.JSONField(default=list, help_text="攝取過多的營養素")
+    lacking_nutrients = models.JSONField(default=list, help_text="攝取不足的營養素")
     nutrition_score = models.IntegerField(null=True, blank=True, help_text="營養評分 1-100")
 
     status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.PENDING, help_text="狀態")
-    ai_model_used = models.CharField(max_length=50, help_text="使用的 AI 模型(gpt-4o / gemini-pro)")
+    ai_model_used = models.CharField(max_length=50, help_text="使用的 AI 模型")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

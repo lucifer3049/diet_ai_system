@@ -34,13 +34,17 @@ class UserProfileSerializer(serializers.ModelSerializer):
     使用者個人資料 Serializer
     bmi 是 @property，用 read_only讀取
     """
+    bmi = serializers.FloatField(read_only=True)
+    age = serializers.IntegerField(read_only=True)
+    daily_nutrition_needs = serializers.DictField(read_only=True)
+
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email',
-            'height', 'weight', 'birth_date',
-            'goal', 'daily_calorie_target', 'bmi',
-            'preferred_ai_provider', 
+            'gender', 'height', 'weight', 'birth_date',  
+            'goal', 'bmi', 'age', 'daily_nutrition_needs',
+            'preferred_ai_provider',
             'created_at'
         ]
         read_only_fields = ['id', 'username', 'created_at']

@@ -15,7 +15,7 @@ class OpenAIService(BaseAIService):
     def __init__(self):
         # 透過.env環境變數讀取AI的API KEY 以及使用模型，避免寫死模型
         self.client = OpenAI(api_key=config('OPENAI_API_KEY'))
-        self.model = config('OPENAI_MODEL', default='gpt-4o-mini')
+        self.model_name = config('OPENAI_MODEL', default='gpt-4o-mini')
     
     def _call_api(self, prompt: str) -> str:
         """

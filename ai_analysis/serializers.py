@@ -6,6 +6,7 @@ class AIAnalysisSerializer(serializers.ModelSerializer):
         model = AIAnalysis
         fields = [
             'id', 'diary_entry', 'summary',
-            'suggestions', 'nutrition_score',
-            'status', 'ai_model_used', 'created_at'
+            'suggestions', 'exceeded_nutrients', 'lacking_nutrients',
+            'nutrition_score', 'status', 'ai_model_used', 'created_at'
         ]
+        read_only_fields = fields

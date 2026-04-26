@@ -12,10 +12,6 @@ class User(AbstractUser):
         FEMALE = 'female', '女性'
         OTHER = 'other', '其他'
 
-    class GoalChoices(models.TextChoices):
-        LOSE_WEIGHT = 'lose_weight', '減重'
-        MAINTAIN = 'maintain', '維持體重'
-        GAIN_MUSCLE = 'gain_muscle', '增肌'
 
     class AIProviderChoices(models.TextChoices):
         # 使用者選擇自己喜歡的AI模型
@@ -27,23 +23,23 @@ class User(AbstractUser):
         MAINTAIN = 'maintain', '維持體重'
         GAIN_MUSCLE = 'gain_muscle', '增肌'
 
-
-    height = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="身高 (cm)")
-    weight = models.DecimalField(max_digits=5,decimal_places=2, null=True, blank=True, help_text="體重 (kg)")
-    birth_date = models.DateField(null=True, blank=True, help_text="出生日期")
-    goal = models.CharField(max_length=20, choices=GoalChoices.choices, default=GoalChoices.MAINTAIN, help_text="目標")
-    daily_calorie_target = models.IntegerField(null=True, blank=True, help_text="每日目標熱量 (kcal)")
-
+    gender = models.CharField(max_length=10, choices=GenderChoices.choices, null=True, blank=True, verbose_name="性別", help_text="請選擇性別")
+    height = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="身高 (cm)", help_text="身高 (cm)")
+    weight = models.DecimalField(max_digits=5,decimal_places=2, null=True, blank=True, verbose_name="體重 (kg)", help_text="體重 (kg)")
+    birth_date = models.DateField(null=True, blank=True, verbose_name="出生日期", help_text="出生日期")
+    goal = models.CharField(max_length=20, choices=GoalChoices.choices, default=GoalChoices.MAINTAIN,verbose_name="目標", help_text="目標")
+   
     preferred_ai_provider = models.CharField(
         max_length=20, 
         choices=AIProviderChoices.choices, 
         default=AIProviderChoices.OPENAI, 
+        verbose_name="偏好的AI模型提供者", 
         help_text="偏好的AI模型提供者"
     )
 
     # 時間記錄
-    created_at = models.DateTimeField(auto_now_add=True, help_text="建立時間")
-    updated_at = models.DateTimeField(auto_now=True, help_text="更新時間")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間", help_text="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間", help_text="更新時間")
 
     class Meta:
         db_table = 'users' # 資料表名稱
