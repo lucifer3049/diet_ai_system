@@ -1,5 +1,5 @@
 import logging
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from .models import DiaryEntry
@@ -34,21 +34,63 @@ class DiaryEntryViewSet(viewsets.ModelViewSet):
         """
 
         from ai_analysis.services import get_ai_service
+        from ai_analysis.services.base import NutritionAnalysisResult
         from ai_analysis.models import AIAnalysis
+        from nutrition.models import FoodNutritionCache
 
         user = diary_entry.user
         provider = user.preferred_ai_provider
 
         try:
             service = get_ai_service(provider)
+            food_name = diary_entry.food_name.strip()
 
-            # AI 分析食物營養素
-            nutrition_result = service.analyze_food_nutrition(
-                food_name=diary_entry.food_name,
-                portion_description=diary_entry.portion_description,
-            )
+            # 檢查 FoodNutritionCache 是否有快取資料
+            cached = FoodNutritionCache.objects.filter(food_name=food_name).first()
+            if cached:
+                logger.info(f"找到快取的營養資料，直接使用，food_name={food_name}")
 
-            # 營養素存回日記
+                cached.hit_count += 1
+                cached.save(update_fields=['hit_count', 'updated_at'])
+
+                nutrition_result = NutritionAnalysisResult(
+                    calories=float(cached.calories),
+                    protein=float(cached.protein),
+                    fat=float(cached.fat),
+                    saturated_fat=float(cached.saturated_fat),
+                    trans_fat=float(cached.trans_fat),
+                    carbohydrates=float(cached.carbohydrates),
+                    sugar=float(cached.sugar),
+                    sodium=float(cached.sodium),
+                    food_description=cached.food_description,
+                    raw_response='{"source": "cache"}'
+                )
+            else:
+                logger.info(f"找不到快取的營養資料，使用 AI 分析，food_name={food_name}")
+
+                # AI 分析食物營養素
+                nutrition_result = service.analyze_food_nutrition(
+                    food_name=diary_entry.food_name,
+                    portion_description=diary_entry.portion_description,
+                )
+
+                # 將分析結果存到 FoodNutritionCache
+                FoodNutritionCache.objects.create(
+                    food_name=food_name,
+                    calories=nutrition_result.calories,
+                    protein=nutrition_result.protein,
+                    fat=nutrition_result.fat,
+                    saturated_fat=nutrition_result.saturated_fat,
+                    trans_fat=nutrition_result.trans_fat,
+                    carbohydrates=nutrition_result.carbohydrates,
+                    sugar=nutrition_result.sugar,
+                    sodium=nutrition_result.sodium,
+                    food_description=nutrition_result.food_description,
+                    ai_model_used=service.model_name,
+                )
+                logger.info(f"已將 AI 分析結果存到快取，food_name={food_name}")
+
+            # 營養資料存回日記
             diary_entry.calories = nutrition_result.calories
             diary_entry.protein = nutrition_result.protein
             diary_entry.fat = nutrition_result.fat

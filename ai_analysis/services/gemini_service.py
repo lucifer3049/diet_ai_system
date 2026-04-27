@@ -1,6 +1,7 @@
 import json
 import logging
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from decouple import config
 from .base import BaseAIService, NutritionAnalysisResult, DietaryAdviceResult
 
@@ -12,19 +13,20 @@ class GeminiService(BaseAIService):
     """
 
     def __init__(self):
-        genai.configure(api_key=config('GEMINI_API_KEY'))
-        self.model_name = config('GEMINI_MODEL', default='gemini-2.0-flash')
-        self.model = genai.GenerativeModel(
-            model_name=self.model_name,
-            generation_config={
-                "response_mime_type": "application/json", # 回傳格式 JSON
-                "temperature": 0.7,
-            }
-        )
+        self.client = genai.Client(api_key=config('GEMINI_API_KEY'))
+        self.model_name = config('GEMINI_MODEL_NAME', default='gemini-2.5-flash')
+  
     
     def _call_api(self, prompt: str) -> str:
         """統一 API 呼叫方法，方便未來如果要換模型或調整參數，只需要修改這裡"""
-        response = self.model.generate_content(prompt)
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type='application/json',
+                temperature=0.7,
+            )
+        )
         return response.text
     
     def analyze_food_nutrition(self, food_name: str, portion_description: str = '') -> NutritionAnalysisResult:

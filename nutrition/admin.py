@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Food
+from .models import Food, FoodNutritionCache
 
 @admin.register(Food)
 class FoodAdmin(admin.ModelAdmin):
@@ -8,3 +8,9 @@ class FoodAdmin(admin.ModelAdmin):
     search_fields = ['name']
 
 
+
+@admin.register(FoodNutritionCache)
+class FoodNutritionCacheAdmin(admin.ModelAdmin):
+    list_display = ['food_name', 'calories', 'protein', 'ai_model_used', 'hit_count', 'created_at']
+    search_fields = ['food_name']
+    readonly_fields = ['hit_count', 'created_at', 'updated_at']
