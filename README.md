@@ -132,28 +132,28 @@ diet-ai-system/
 ## API 端點
 ```
 # 認證使用者
-POST   /api/auth/register/          ← 註冊
-POST   /api/auth/login/             ← 登入（取得 JWT token）
-POST   /api/auth/token/refresh/     ← 刷新 token
+POST   /api/v1/auth/register/          ← 註冊
+POST   /api/v1/auth/login/             ← 登入（取得 JWT token）
+POST   /api/v1/auth/token/refresh/     ← 刷新 token
 
 # 使用者
-GET    /api/users/me/               ← 取得自己的資料
-PATCH  /api/users/me/               ← 更新自己的資料
+GET    /api/v1/users/me/               ← 取得自己的資料
+PATCH  /api/v1/users/me/               ← 更新自己的資料
 
 # 食物資料庫（nutrition）
-GET    /api/foods/                  ← 列出所有食物
-POST   /api/foods/                  ← 新增食物
-GET    /api/foods/{id}/             ← 取得單一食物
-PATCH  /api/foods/{id}/             ← 更新食物
-DELETE /api/foods/{id}/             ← 刪除食物
+GET    /api/v1/foods/                  ← 列出所有食物
+POST   /api/v1/foods/                  ← 新增食物
+GET    /api/v1/foods/{id}/             ← 取得單一食物
+PATCH  /api/v1/foods/{id}/             ← 更新食物
+DELETE /api/v1/foods/{id}/             ← 刪除食物
 
 # 飲食日記（diary）
-GET    /api/diary/                  ← 列出我的日記
-POST   /api/diary/                  ← 新增一筆日記
-GET    /api/diary/{id}/             ← 取得單一日記
-PATCH  /api/diary/{id}/             ← 更新日記
-DELETE /api/diary/{id}/             ← 刪除日記
-POST   /api/diary/{id}/add-food/    ← 新增食物到日記
+GET    /api/v1/diary/                  ← 列出我的日記
+POST   /api/v1/diary/                  ← 新增一筆日記
+GET    /api/v1/diary/{id}/             ← 取得單一日記
+PATCH  /api/v1/diary/{id}/             ← 更新日記
+DELETE /api/v1/diary/{id}/             ← 刪除日記
+POST   /api/v1/diary/{id}/add-food/    ← 新增食物到日記
 
 ```
 
