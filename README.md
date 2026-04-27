@@ -46,7 +46,7 @@ DB_PORT=5432
 
 AI_PROVIDER=openai  # 改成 gemini 可切換
 OPENAI_API_KEY=''
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-4o-mini  # 選自己想要的
 GEMINI_API_KEY=''
 GEMINI_MODEL=gemini-1.5-flash
 ```
@@ -156,16 +156,6 @@ DELETE /api/diary/{id}/             ← 刪除日記
 POST   /api/diary/{id}/add-food/    ← 新增食物到日記
 
 ```
-
-# 專案架構
-mkdir config\settings 
-type nul > config\settings\__init__.py
-type nul > config\settings\base.py  # 共用環境設定 (INSTALLED_APPS、REST_FRAMEWORK 等)
-type nul > config\settings\development.py # 開發專用(DEBUG=True，詳細log，允許所有 CORS)
-type nul > config\settings\production.py # 正式環境專用(DEBUG=FALSE，安全設定，效能優化)
-
-mkdir logs  # logs 專門設定log的地方
-type nul > logs\.gitkeep
 
 
 # 開發進度
