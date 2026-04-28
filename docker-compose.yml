@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  web:
+    build: .
+    container_name: diet_ai_web
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+
+  db:
+    image: postgres:15
+    container_name: diet_ai_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=diet_user
+      - POSTGRES_PASSWORD=diet_pass
+      - POSTGRES_DB=diet_ai_db
+
+volumes:
+  postgres_data:

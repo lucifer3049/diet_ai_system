@@ -52,6 +52,44 @@ GEMINI_MODEL=gemini-1.5-flash
 ```
 ---
 
+# Docker 啟動
+```
+# 啟動 Docker 
+# 前景執行，第一次執行使用或DEBUG使用
+docker-compose up
+# 背景執行，開發時使用
+docker-compose up -d --build
+
+# 確認 Docker 有沒有啟動
+docker-compose ps
+
+# Docker log
+docker-compose logs -f
+
+# 進入 Django容器
+docker-compose exec web bash
+
+# 重製Docker(包含資料庫)
+docker-compose down -v
+
+# 停止Docker服務
+docker-compose down
+
+# 第一次建立要執行，建立資料表
+python manage.py migrate
+
+# 建立 admin
+python manage.py createsuperuser
+
+# 進入 Django shell，測試 ORM/API
+python manage.py shell
+
+
+
+
+```
+
+
 # 快速開始
 
 ```bash
@@ -163,6 +201,9 @@ POST   /api/v1/diary/{id}/add-food/    ← 新增食物到日記
 - [V] 第 2 階段:資料庫與Models設計
 - [V] 第 3 階段:RESTful API (DRF) + Swagger UI
 - [V] 第 4 階段:AI Service Layer
-- [] 第 5 階段：Docker
+    - [V] OpenAI / Gemini 雙模型支援
+    - [V] 三層切換機制
+    - [V] 食物營養快取 (FoodNutritionCache)
+- [V] 第 5 階段：Docker
 - [] 第 6 階段：Django + Docker 整合
 - [] 第 7 階段：CI/CD (GitGub Action)
