@@ -146,24 +146,33 @@ diet-ai-system/
 
 ## API 端點
 ```
+AI分析
+POST /api/v1/ai/analyze/{diary_id}/  分析飲食日誌
+GET /api/v1/ai/my-analyses/          取得AI分析資料
+
 認證
 POST /api/v1/auth/register/       使用者註冊
 POST /api/v1/auth/login/          登入取得 JWT Token
 POST /api/v1/auth/token/refresh/  刷新 Token
+
 使用者
 GET  /api/v1/users/me/            取得個人資料（含 BMI、每日營養需求）
 PATCH /api/v1/users/me/           更新個人資料
+
 飲食日記
 POST /api/v1/diary/               新增日記（自動觸發 AI 分析）
 GET  /api/v1/diary/               我的日記列表
 GET  /api/v1/diary/{id}/          單筆日記（含營養素）
 PATCH /api/v1/diary/{id}/         更新日記
 DELETE /api/v1/diary/{id}/        刪除日記
+
 食物資料庫
 GET  /api/v1/foods/               食物列表（支援搜尋）
 POST /api/v1/foods/               新增食物
-AI 分析
-GET  /api/v1/ai/my-analyses/      我的 AI 分析記錄
+GET  /api/v1/foods/{id}/          取得單一食物
+PUT /api/v1/foods/{id}/           完整更新食物
+PATCH /api/v1/foods/{id}/         更新部分食物
+DELETE /api/v1/foods/{id}/        刪除食物
 
 ```
 
