@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.shortcuts import redirect
 from drf_spectacular.views import (
     SpectacularAPIView,  # 產生 schema 的核心 view
     SpectacularSwaggerView, # Swagger UI 介面
@@ -24,6 +25,8 @@ from drf_spectacular.views import (
 
 # Django 整合Django DRF所有專案的URL路口
 urlpatterns = [
+    path('', lambda request: redirect('api/docs/')), # 根路徑導向API文件    
+
     path('admin/', admin.site.urls),
 
     # API 文件
