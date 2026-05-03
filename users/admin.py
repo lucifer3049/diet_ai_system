@@ -10,7 +10,7 @@ class CustomUserAdmin(UserAdmin):
     
     fieldsets = UserAdmin.fieldsets + (
         ('健康資料', {
-            'fields': ('height', 'weight', 'birth_date', 'goal', 'daily_calorie_target', 'preferred_ai_provider')
+            'fields': ('height', 'weight', 'birth_date', 'goal',  'preferred_ai_provider')
         }),
     )
 

@@ -1,0 +1,13 @@
+# 正式環境
+services:
+  web:
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4
+    # gunicorn = 正式環境用的 WSGI server，比 runserver 穩定、效能好
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+  
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"

@@ -21,6 +21,7 @@ staticfiles/
 
 # Docker
 *.env.local
+docker-compose.override.yml
 
 # IDE
 .vscode/
@@ -30,3 +31,4 @@ EOF
 
 # Logs
 logs/*.log
+media/

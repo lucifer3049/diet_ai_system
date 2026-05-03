@@ -1,29 +1,63 @@
-version: "3.9"
+# docker-compose.yml
 
 services:
+
+  # ── Django Web Server ─────────────────────────
   web:
-    build: .
-    container_name: diet_ai_web
-    command: python manage.py runserver 0.0.0.0:8000
+    build: .                          # 用當前目錄的 Dockerfile 建立
+    container_name: diet-ai-web
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+    # 為什麼 0.0.0.0 而不是 127.0.0.1？
+    # 127.0.0.1 = 只有容器內部能存取
+    # 0.0.0.0 = 允許外部（你的瀏覽器）連進來
     volumes:
-      - .:/app
+      - .:/app                        # 本機程式碼同步到容器（改程式碼不用重建）
+      - media_data:/app/media         # 上傳的圖片持久化存放
     ports:
-      - "8000:8000"
+      - "8000:8000"                   # 本機 8000 → 容器 8000
     env_file:
-      - .env
+      - .env                          # 從 .env 讀取環境變數
     depends_on:
-      - db
+      db:
+        condition: service_healthy    # 等 PostgreSQL 健康檢查通過才啟動
+      redis:
+        condition: service_healthy    # 等 Redis 健康檢查通過才啟動
 
-
+  # ── PostgreSQL ────────────────────────────────
   db:
-    image: postgres:15
-    container_name: diet_ai_db
+    image: postgres:15                # 直接用官方 PostgreSQL image，不需要自己寫 Dockerfile
+    container_name: diet-ai-db
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
+      - postgres_data:/var/lib/postgresql/data   # 資料持久化，容器刪掉資料不會不見
     environment:
-      - POSTGRES_USER=diet_user
-      - POSTGRES_PASSWORD=diet_pass
-      - POSTGRES_DB=diet_ai_db
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5433:5432"                   # 用 5433 避免跟本機 PostgreSQL 衝突
+    healthcheck:                      # 健康檢查：確認 PostgreSQL 真的可以用了
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s                    # 每 5 秒檢查一次
+      timeout: 5s                     # 超過 5 秒算失敗
+      retries: 5                      # 失敗 5 次才放棄
 
+  # ── Redis ─────────────────────────────────────
+  redis:
+    image: redis:7-alpine             # alpine = 超精簡版，image 更小
+    container_name: diet-ai-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+# ── 持久化儲存 ────────────────────────────────────
+# Volume = Docker 管理的儲存空間
+# 容器刪掉後資料還在，下次啟動還能用
 volumes:
   postgres_data:
+  media_data:

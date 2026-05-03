@@ -1,10 +1,11 @@
 FROM python:3.12.4-slim
 
-# 基本環境設定
+# PYTHONDONTWRITEBYTECODE 不產生 .pyc 檔案
+# PYTHONDONTWRITEBYTECODE 讓print/log 即時顯示
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# 設定工作目錄
+# 設定工作目錄，之後所有指令都在這個目錄裡面執行
 WORKDIR /app
 
 # apt-get update 更新Linux套件
@@ -20,10 +21,17 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 安裝 Python 套件
+# 複製 requirements.txt 到容器中
+# Docker 有快取機制:這層沒變就不會重新執行
+# 套件沒更新的話，下次 build 直接跳過這步驟，節省時間
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
+# 複製專案的所有檔案到容器中
 COPY . .
+
+# 建立log資料夾
+RUN mkdir -p logs
 
 # 預設開發環境
 # development 測試開發環境
