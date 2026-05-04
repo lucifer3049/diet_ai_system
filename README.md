@@ -35,6 +35,8 @@ docker compose down         # 停止
 docker compose down -v      # 停止並清空資料庫
 docker compose logs -f web  # 查看 log
 docker compose ps           # 查看容器狀態
+docker compose exec web bash # 進入容器
+docker compose exec web sh # 檢查有沒有bash
 
 # 容器內執行 Django 指令
 docker compose exec web python manage.py migrate
