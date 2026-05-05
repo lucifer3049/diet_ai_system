@@ -178,6 +178,9 @@ DELETE /api/v1/foods/{id}/        刪除食物
 
 ```
 
+## Django 自動化測試
+pip install pytest pytest-django pytest-cov factory-boy faker freezegun 
+
 
 ## 開發進度
 
@@ -190,7 +193,8 @@ DELETE /api/v1/foods/{id}/        刪除食物
   - [V] 食物營養快取（FoodNutritionCache）
   - [V] Harris-Benedict 公式計算每日營養需求
 - [V] 第 5 & 6 階段：Docker + Docker Compose
-- [ ] 第 7 階段：CI/CD（GitHub Actions）
+- [V] 第 7 階段：CI/CD（GitHub Actions）
+- [] 第 8 階段: 測試 Testing
 
 ## 未來規劃
 

@@ -55,7 +55,8 @@ jobs:
       # Step 6：執行測試（用 testing settings）
       - name: 執行測試
         run: |
-          python manage.py test --settings=config.settings.testing -v 2
+          pytest --cov=. --cov-report=xml --cov-fail-under=70 \
+              --settings=config.settings.testing -v
 
       # Step 7：確認 Django 設定正確
       - name: Django 系統檢查
