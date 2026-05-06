@@ -202,3 +202,19 @@ pip install pytest pytest-django pytest-cov factory-boy faker freezegun
 - [ ] 圖片辨識（上傳食物照片自動識別）
 - [ ] 每日 / 每週飲食趨勢分析
 - [ ] React 前端(前後端分離) 或 Vue/Vite
+
+## Docker Hub建立
+```
+# 建立本地 Docker 映像檔
+docker build -t hoaquan/diet-ai-system:latest .
+
+# 登入Docker Hub
+docker login -u hoaquan
+
+# 上傳到Docker Hub
+docker push hoaquan/diet-ai-system:latest
+
+# 驗證docker
+docker images
+
+```
