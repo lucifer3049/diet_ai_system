@@ -5,6 +5,11 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 from .models import DiaryEntry
 from .serializers import DiaryEntrySerializer
 
+from ai_analysis.services import get_ai_service
+from ai_analysis.services.base import NutritionAnalysisResult
+from ai_analysis.models import AIAnalysis
+from nutrition.models import FoodNutritionCache
+
 logger = logging.getLogger(__name__)
 
 @extend_schema_view(
@@ -32,12 +37,6 @@ class DiaryEntryViewSet(viewsets.ModelViewSet):
         """
         建立日記後自動呼叫AI分析
         """
-
-        from ai_analysis.services import get_ai_service
-        from ai_analysis.services.base import NutritionAnalysisResult
-        from ai_analysis.models import AIAnalysis
-        from nutrition.models import FoodNutritionCache
-
         user = diary_entry.user
         provider = user.preferred_ai_provider
 
@@ -146,8 +145,3 @@ class DiaryEntryViewSet(viewsets.ModelViewSet):
             logger.error(f"AI 分析失敗，diary_id={diary_entry.id}，錯誤:{e}")
             diary_entry.status = DiaryEntry.StatusChoices.FAILED
             diary_entry.save(update_fields=['status'])
-
-
-
-
-            
