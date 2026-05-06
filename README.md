@@ -70,6 +70,7 @@ source venv/bin/activate     # Mac/Linux
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py runserver
+deactivate # 離開venv
 ```
 
 ## 環境變數說明
@@ -107,9 +108,9 @@ GEMINI_MODEL=gemini-2.0-flash
 - Google Gemini API（Gemini 2.0 Flash）
 - 工廠模式 + 抽象介面設計
 
-### DevOps (規劃中)
-- Docker + Docker Compose
-- GitHub Actions CI/CD（規劃中）
+### DevOps
+- Docker + Docker Compose + DockerHub
+- GitHub Actions CI/CD
 
 ---
 
