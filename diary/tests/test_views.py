@@ -35,7 +35,7 @@ class TestDiaryCreateView:
         self.user = user
         self.url = '/api/v1/diary/'
 
-    @patch('diary.views.get_ai_service')
+    @patch('diary.services.get_ai_service')
     def test_create_diary_triggers_ai_analysis(self, mock_get_service):
         """新增日記後，AI 分析應自動執行並儲存結果"""
         mock_service = MagicMock()
@@ -63,7 +63,7 @@ class TestDiaryCreateView:
         assert analysis.nutrition_score == 75
         assert "鈉" in analysis.exceeded_nutrients
 
-    @patch('diary.views.get_ai_service')
+    @patch('diary.services.get_ai_service')
     def test_ai_failure_marks_diary_as_failed(self, mock_get_service):
         """AI 分析失敗時，日記狀態應標記為 failed，不拋出 500"""
         mock_service = MagicMock()
@@ -82,7 +82,7 @@ class TestDiaryCreateView:
         diary = DiaryEntry.objects.get(id=response.data['id'])
         assert diary.status == 'failed'
 
-    @patch('diary.views.get_ai_service')
+    @patch('diary.services.get_ai_service')
     def test_food_nutrition_cache_is_used(self, mock_get_service):
         """相同食物第二次新增時，應使用快取而不重新呼叫 AI"""
         from nutrition.models import FoodNutritionCache
