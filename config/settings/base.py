@@ -128,7 +128,7 @@ SPECTACULAR_SETTINGS = {
 ## AI 飲食控制系統
 
 這個 API 提供以下功能：
-- 使用者註冊 / 登入（JWT 認證）
+- 使用者註冊 / 登入(JWT 認證)
 - 飲食日記 CRUD
 - 食物營養資料庫
 - AI 飲食分析建議
@@ -146,3 +146,15 @@ SPECTACULAR_SETTINGS = {
         }
     },
 }
+
+# Celery 設定
+CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Asia/Taipei'
+
+# Task 超時設定 (AI 分析最多等待秒數)
+CELERY_TASK_SOFT_TIME_LIMIT = 120
+CELERY_TASK_TIME_LIMIT = 130

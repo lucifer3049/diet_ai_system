@@ -17,6 +17,7 @@ class DiaryEntry(models.Model):
     
     class StatusChoices(models.TextChoices):
         PENDING = 'pending', '等待分析'
+        PROCESSING = 'processing', '分析中'
         COMPLETED = 'completed', '分析完成'
         FAILED = 'failed', '分析失敗'
 

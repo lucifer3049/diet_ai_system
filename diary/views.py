@@ -1,14 +1,10 @@
 import logging
 from rest_framework import viewsets, permissions
-from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from .models import DiaryEntry
 from .serializers import DiaryEntrySerializer
+from .tasks import analyze_diary_entry_task
 
-from ai_analysis.services import get_ai_service
-from ai_analysis.services.base import NutritionAnalysisResult
-from ai_analysis.models import AIAnalysis
-from nutrition.models import FoodNutritionCache
 
 logger = logging.getLogger(__name__)
 
@@ -31,117 +27,7 @@ class DiaryEntryViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         diary_entry = serializer.save(user=self.request.user)
-        self._trigger_ai_analysis(diary_entry)
-        
-    def _trigger_ai_analysis(self, diary_entry: DiaryEntry):
-        """
-        建立日記後自動呼叫AI分析
-        """
-        user = diary_entry.user
-        provider = user.preferred_ai_provider
 
-        try:
-            service = get_ai_service(provider)
-            food_name = diary_entry.food_name.strip()
-
-            # 檢查 FoodNutritionCache 是否有快取資料
-            cached = FoodNutritionCache.objects.filter(food_name=food_name).first()
-            if cached:
-                logger.info(f"找到快取的營養資料，直接使用，food_name={food_name}")
-
-                cached.hit_count += 1
-                cached.save(update_fields=['hit_count', 'updated_at'])
-
-                nutrition_result = NutritionAnalysisResult(
-                    calories=float(cached.calories),
-                    protein=float(cached.protein),
-                    fat=float(cached.fat),
-                    saturated_fat=float(cached.saturated_fat),
-                    trans_fat=float(cached.trans_fat),
-                    carbohydrates=float(cached.carbohydrates),
-                    sugar=float(cached.sugar),
-                    sodium=float(cached.sodium),
-                    food_description=cached.food_description,
-                    raw_response='{"source": "cache"}'
-                )
-            else:
-                logger.info(f"找不到快取的營養資料，使用 AI 分析，food_name={food_name}")
-
-                # AI 分析食物營養素
-                nutrition_result = service.analyze_food_nutrition(
-                    food_name=diary_entry.food_name,
-                    portion_description=diary_entry.portion_description,
-                )
-
-                # 將分析結果存到 FoodNutritionCache
-                FoodNutritionCache.objects.create(
-                    food_name=food_name,
-                    calories=nutrition_result.calories,
-                    protein=nutrition_result.protein,
-                    fat=nutrition_result.fat,
-                    saturated_fat=nutrition_result.saturated_fat,
-                    trans_fat=nutrition_result.trans_fat,
-                    carbohydrates=nutrition_result.carbohydrates,
-                    sugar=nutrition_result.sugar,
-                    sodium=nutrition_result.sodium,
-                    food_description=nutrition_result.food_description,
-                    ai_model_used=service.model_name,
-                )
-                logger.info(f"已將 AI 分析結果存到快取，food_name={food_name}")
-
-            # 營養資料存回日記
-            diary_entry.calories = nutrition_result.calories
-            diary_entry.protein = nutrition_result.protein
-            diary_entry.fat = nutrition_result.fat
-            diary_entry.saturated_fat = nutrition_result.saturated_fat
-            diary_entry.trans_fat = nutrition_result.trans_fat
-            diary_entry.carbohydrates = nutrition_result.carbohydrates
-            diary_entry.sugar = nutrition_result.sugar
-            diary_entry.sodium = nutrition_result.sodium
-            diary_entry.status = DiaryEntry.StatusChoices.COMPLETED
-            diary_entry.save()
-
-            # 建立AI飲食建議
-            diary_data = {
-                'food_name': diary_entry.food_name,
-                'portion_description': diary_entry.portion_description,
-                'calories': diary_entry.calories,
-                'protein': diary_entry.protein,
-                'fat': diary_entry.fat,
-                'saturated_fat': diary_entry.saturated_fat,
-                'trans_fat': diary_entry.trans_fat,
-                'carbohydrates': diary_entry.carbohydrates,
-                'sugar': diary_entry.sugar,
-                'sodium': diary_entry.sodium,
-            }
-
-            user_profile = {
-                'gender': user.get_gender_display() if user.gender else '未提供',
-                'age': user.age,
-                'height': float(user.height) if user.height else None,
-                'weight': float(user.weight) if user.weight else None,
-                'bmi': user.bmi,
-                'goal': user.get_goal_display()
-            }
-
-            daily_needs = user.daily_nutrition_needs or {}
-
-            advice_result = service.give_dietary_advice(diary_data, user_profile, daily_needs)
-
-            AIAnalysis.objects.create(
-                user=user,
-                diary_entry=diary_entry,
-                prompt_sent=f"食物分析：{diary_entry.food_name}",
-                raw_response=advice_result.raw_response,
-                summary=advice_result.summary,
-                suggestions=advice_result.next_meal_suggestions,
-                exceeded_nutrients=advice_result.exceeded_nutrients,
-                lacking_nutrients=advice_result.lacking_nutrients,
-                nutrition_score=advice_result.nutrition_score,
-                status=AIAnalysis.StatusChoices.COMPLETED,
-                ai_model_used=f"{provider}:{service.model_name}",
-            )
-        except Exception as e:
-            logger.error(f"AI 分析失敗，diary_id={diary_entry.id}，錯誤:{e}")
-            diary_entry.status = DiaryEntry.StatusChoices.FAILED
-            diary_entry.save(update_fields=['status'])
+        # 非同步:丟給 Celery，立刻回傳，不用等待分析完成
+        analyze_diary_entry_task.delay(diary_entry.id)
+        logger.info(f"已排程 AI 分析，diary_id={diary_entry.id}")
