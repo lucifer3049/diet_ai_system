@@ -43,7 +43,7 @@ services:
       timeout: 5s                     # 超過 5 秒算失敗
       retries: 5                      # 失敗 5 次才放棄
 
-  # ── Redis ─────────────────────────────────────
+  # Redis
   redis:
     image: redis:7-alpine             # alpine = 超精簡版，image 更小
     container_name: diet-ai-redis
@@ -54,8 +54,39 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+  
+  # Celery 背景執行任務
+  celery:
+    build: .
+    container_name: diet-ai-celery
+    command: celery -A config worker --loglevel=info --concurrency=2
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
+    
+  # Celery Beat 定時任務
+  celery-beat:
+    build: .
+    container_name: diet-ai-celery-beat
+    command: celery -A config beat --loglevel=info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
 
-# ── 持久化儲存 ────────────────────────────────────
+# 持久化儲存
 # Volume = Docker 管理的儲存空間
 # 容器刪掉後資料還在，下次啟動還能用
 volumes:

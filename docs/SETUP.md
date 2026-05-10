@@ -38,6 +38,9 @@ pip install celery==5.4.0 # 非同步任務處理 跑太慢的話可以避免卡
 pip install drf-spectacular # 安裝 API 自動產生文件 
 pip install --upgrade google-generativeai # 更新gemini模型
 pip install google-genai # 更新 gemini套件
+pip install debugpy # Debug套件
+pip install celery # 非同步任務佇列
+pip install celery redis 
 
 # 產生依賴紀錄.txt
 pip freeze > requirements.txt # 每次安裝新套件都要執行一次，確保其他環境也可以保持一樣的環境
