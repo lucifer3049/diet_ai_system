@@ -40,5 +40,3 @@ def analyze_diary_entry_task(self, diary_entry_id: int):
 
         # 更新狀態為失敗
         DiaryEntry.objects.filter(id=diary_entry_id).update(status=DiaryEntry.StatusChoices.FAILED)
-
-        raise self.retry(exc=exc)
