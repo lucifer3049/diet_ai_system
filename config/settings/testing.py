@@ -2,8 +2,6 @@ from .base import *  # noqa
 
 DEBUG = False
 
-# Celery 測試模式:
-
 # CI 測試用 SQLite，不需要 PostgreSQL
 DATABASES = {
     'default': {
