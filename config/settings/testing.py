@@ -2,6 +2,8 @@ from .base import *  # noqa
 
 DEBUG = False
 
+# Celery 測試模式:
+
 # CI 測試用 SQLite，不需要 PostgreSQL
 DATABASES = {
     'default': {
@@ -19,3 +21,7 @@ AI_PROVIDER = 'mock'
 PASSWORD_HASHERS = [
     'django.contrib.auth.hashers.MD5PasswordHasher',
 ]
+
+# 測試時 Celery 不用 Redis，同步執行
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
