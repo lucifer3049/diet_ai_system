@@ -1,6 +1,5 @@
 # 飲食控制AI系統
-
-一個 AI 驅動的飲食管理後端系統。使用者輸入每餐食物，系統自動呼叫 AI 分析完整營養素，並根據個人身體數據提供建議。個人練習專案。
+一個Django REST API後端系統，整合OpenAI和Gemini AI，使用者輸入食物名稱，系統自動分析營養素並提供個人化飲食建議，採用Celery非同步處理AI任務，Docker容器化部屬，GitHub Actions CI/CD自動化流程
 
 ---
 
