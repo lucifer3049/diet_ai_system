@@ -117,7 +117,7 @@ class DiaryService:
         }
 
     @classmethod
-    def analyze_diary_entry(cls, diary_entry: DiaryEntry) -> None:
+    def analyze_diary_entry(cls, diary_entry: DiaryEntry) -> dict:
         """
         AI分析流程
         這是對外的主要入口，View 只需要呼叫這一個方法
@@ -163,4 +163,5 @@ class DiaryService:
             nutrition_score=advice_result.nutrition_score,
             status=AIAnalysis.StatusChoices.COMPLETED,
             ai_model_used=f"{provider}:{service.model_name}",
+
         )

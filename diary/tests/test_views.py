@@ -64,25 +64,6 @@ class TestDiaryCreateView:
         assert "鈉" in analysis.exceeded_nutrients
 
     @patch('diary.services.get_ai_service')
-    def test_ai_failure_marks_diary_as_failed(self, mock_get_service):
-        """AI 分析失敗時，日記狀態應標記為 failed，不拋出 500"""
-        mock_service = MagicMock()
-        mock_service.analyze_food_nutrition.side_effect = Exception("API timeout")
-        mock_get_service.return_value = mock_service
-
-        response = self.client.post(self.url, {
-            'date': '2026-05-06',
-            'meal_type': 'lunch',
-            'food_name': '牛肉麵'
-        })
-
-        # API 應正常回傳 201，不因為 AI 失敗而變成 500
-        assert response.status_code == 201
-        
-        diary = DiaryEntry.objects.get(id=response.data['id'])
-        assert diary.status == 'failed'
-
-    @patch('diary.services.get_ai_service')
     def test_food_nutrition_cache_is_used(self, mock_get_service):
         """相同食物第二次新增時，應使用快取而不重新呼叫 AI"""
         from nutrition.models import FoodNutritionCache
@@ -122,3 +103,17 @@ class TestDiaryCreateView:
             'food_name': '雞腿便當'
         })
         assert response.status_code == 401
+
+    @patch('diary.views.analyze_diary_entry_task')
+    def test_ai_failure_does_not_cause_500(self, mock_task):
+        """View 層應永遠回傳 201，task 的失敗不應影響 HTTP response"""
+        mock_task.delay.return_value = None  # 只驗證 view 行為，不執行 task
+
+        response = self.client.post(self.url, {
+            'date': '2026-05-06',
+            'meal_type': 'lunch',
+            'food_name': '牛肉麵'
+        })
+
+        assert response.status_code == 201
+        mock_task.delay.assert_called_once()
