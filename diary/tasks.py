@@ -32,6 +32,8 @@ def analyze_diary_entry_task(self, diary_entry_id: int):
         diary_entry.save(update_fields=['status'])
 
         DiaryService.analyze_diary_entry(diary_entry)
+        diary_entry.status = DiaryEntry.StatusChoices.COMPLETED
+        diary_entry.save(update_fields=["status"])
         logger.info(f"分析完成，diary_id={diary_entry_id}")
     except DiaryEntry.DoesNotExist:
         logger.error(f"找不到日記，diary_id={diary_entry_id}")
@@ -40,3 +42,4 @@ def analyze_diary_entry_task(self, diary_entry_id: int):
 
         # 更新狀態為失敗
         DiaryEntry.objects.filter(id=diary_entry_id).update(status=DiaryEntry.StatusChoices.FAILED)
+        raise self.retry(exc=exc)

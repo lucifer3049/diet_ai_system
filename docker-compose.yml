@@ -64,13 +64,13 @@ services:
       - .:/app
     env_file:
       - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.development
     
   # Celery Beat 定時任務
   celery-beat:
