@@ -104,16 +104,18 @@ class TestDiaryCreateView:
         })
         assert response.status_code == 401
 
-    @patch('diary.views.analyze_diary_entry_task')
-    def test_ai_failure_does_not_cause_500(self, mock_task):
-        """View 層應永遠回傳 201，task 的失敗不應影響 HTTP response"""
-        mock_task.delay.return_value = None  # 只驗證 view 行為，不執行 task
-
+    @patch('diary.views.analyze_diary_entry_task.delay')
+    def test_create_returns_201_even_if_ai_fails(self, mock_delay):
+        """
+        .delay() 被呼叫但不執行 task
+        view 不等待 task 結果，直接回傳 201
+        """
         response = self.client.post(self.url, {
             'date': '2026-05-06',
             'meal_type': 'lunch',
-            'food_name': '牛肉麵'
+            'food_name': '牛肉麵',
         })
 
+        # view 回傳 201，錯誤 task 處理
         assert response.status_code == 201
-        mock_task.delay.assert_called_once()
+        mock_delay.assert_called_once()

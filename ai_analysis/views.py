@@ -83,6 +83,8 @@ class MyAnalysisListView(APIView):
         responses={200: AIAnalysisSerializer(many=True)}
     )
     def get(self, request):
-        analyses = AIAnalysis.objects.filter(user=request.user).order_by('-created_at')
+        analyses = (
+            AIAnalysis.objects.filter(user=request.user).select_related('diary_entry').order_by('-created_at')
+        )
         
         return Response(AIAnalysisSerializer(analyses, many=True).data)

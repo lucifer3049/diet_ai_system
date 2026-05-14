@@ -4,6 +4,8 @@ from nutrition.models import FoodNutritionCache
 from ai_analysis.models import AIAnalysis
 from ai_analysis.services import get_ai_service
 from ai_analysis.services.base import NutritionAnalysisResult
+from nutrition.cache import get_cached_nutrition, set_cached_nutrition
+from dataclasses import asdict
 
 logger = logging.getLogger(__name__)
 
@@ -20,37 +22,69 @@ class DiaryService:
         service
     ) -> NutritionAnalysisResult:
         """
-        先檢資料庫是否有資料沒有就呼叫AI
-        只做取得營養資料
-        """
-        cached = FoodNutritionCache.objects.filter(food_name=food_name).first()
-        if cached:
-            logger.info(f"找到快取的營養資料，直接使用，food_name={food_name}")
-            cached.hit_count += 1
-            cached.save(update_fields=['hit_count', 'updated_at'])
+        三層資料來源：
 
-            return NutritionAnalysisResult(
-                calories=float(cached.calories),
-                protein=float(cached.protein),
-                fat=float(cached.fat),
-                saturated_fat=float(cached.saturated_fat),
-                trans_fat=float(cached.trans_fat),
-                carbohydrates=float(cached.carbohydrates),
-                sugar=float(cached.sugar),
-                sodium=float(cached.sodium),
-                food_description=cached.food_description,
-                raw_response='{"source": "cache"}'
+        L1 Redis Cache
+        L2 Database Cache
+        L3 AI API
+        """
+
+        normalized_name = food_name.strip().lower()
+
+        # =========================================================
+        # L1 Redis Cache
+        # =========================================================
+        redis_cached = get_cached_nutrition(normalized_name)
+
+        if redis_cached:
+            logger.info(f"Redis cache hit: {normalized_name}")
+
+            return NutritionAnalysisResult(**redis_cached)
+
+        # =========================================================
+        # L2 Database Cache
+        # =========================================================
+        db_cached = FoodNutritionCache.objects.filter(
+            food_name__iexact=normalized_name
+        ).first()
+
+        if db_cached:
+            logger.info(f"DB cache hit: {normalized_name}")
+
+            db_cached.hit_count += 1
+            db_cached.save(update_fields=['hit_count', 'updated_at'])
+
+            result = NutritionAnalysisResult(
+                calories=float(db_cached.calories),
+                protein=float(db_cached.protein),
+                fat=float(db_cached.fat),
+                saturated_fat=float(db_cached.saturated_fat),
+                trans_fat=float(db_cached.trans_fat),
+                carbohydrates=float(db_cached.carbohydrates),
+                sugar=float(db_cached.sugar),
+                sodium=float(db_cached.sodium),
+                food_description=db_cached.food_description,
+                raw_response='{"source":"db_cache"}'
             )
-        
-        logger.info(f"找不到資料，呼叫AI分析:{food_name}")
+
+            # 回填 Redis
+            set_cached_nutrition(
+                normalized_name,
+                asdict(result)
+            )
+
+            return result
+
+        logger.info(f"AI API call: {normalized_name}")
 
         nutrition_result = service.analyze_food_nutrition(
-            food_name=food_name, 
+            food_name=food_name,
             portion_description=portion_description,
         )
 
+        # 存 DB
         FoodNutritionCache.objects.create(
-            food_name=food_name,
+            food_name=normalized_name,
             calories=nutrition_result.calories,
             protein=nutrition_result.protein,
             fat=nutrition_result.fat,
@@ -61,6 +95,12 @@ class DiaryService:
             sodium=nutrition_result.sodium,
             food_description=nutrition_result.food_description,
             ai_model_used=service.model_name,
+        )
+
+        # 存 Redis
+        set_cached_nutrition(
+            normalized_name,
+            asdict(nutrition_result)
         )
 
         return nutrition_result

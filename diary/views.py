@@ -23,7 +23,9 @@ class DiaryEntryViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete']
 
     def get_queryset(self):
-        return DiaryEntry.objects.filter(user=self.request.user)
+        return (
+            DiaryEntry.objects.filter(user=self.request.user).prefetch_related('ai_analysis').order_by('-date', '-created_at')
+        )
     
     def perform_create(self, serializer):
         diary_entry = serializer.save(user=self.request.user)
