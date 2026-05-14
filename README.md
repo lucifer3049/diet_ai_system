@@ -8,21 +8,39 @@
 本專案目的是建立一個完整的：
 
 - 飲食紀錄系統
-- 個人化飲食建議平台
 - AI 自動營養分析
+- 個人化飲食建議
+- 每日營養需求計算
+- 高效能 API 後端架構
 
 ---
 
 ## 功能
 
-- 使用者註冊 / 登入（JWT）
-- 輸入食物名稱，AI 自動分析完整營養素
-- 根據身高、體重、年齡、性別、目標計算每日營養需求
-- AI 營養師建議（攝取過多/不足的營養素、下一餐建議）
-- 食物營養快取（同一食物不重複呼叫 AI）
-- 支援 OpenAI / Gemini 動態切換
-- API 文件（Swagger UI / ReDoc）
+# 使用者系統
+- JWT 註冊 / 登入驗證
+- 個人健康資料管理
+- BMI 自動計算
+- 每日營養需求分析
 
+# AI 營養分析
+- 輸入食物名稱，自動分析營養素
+- 支援 OpenAI / Gemini 動態切換
+- AI 營養師建議
+  - 熱量是否過高
+  - 營養素攝取不足
+  - 下一餐建議
+- 食物營養快取（避免重複 AI 呼叫）
+
+# 飲食日記系統
+- 新增 / 修改 / 刪除飲食紀錄
+- 自動觸發 AI 分析
+- 個人飲食歷史查詢
+
+# API 文件
+- Swagger UI
+- ReDoc
+- OpenAPI 3.0 自動生成
 
 ---
 
@@ -38,8 +56,9 @@ docker compose exec web bash # 進入容器
 docker compose exec web sh # 檢查有沒有bash
 
 # 容器內執行 Django 指令
-docker compose exec web python manage.py migrate
-docker compose exec web python manage.py createsuperuser
+docker compose exec web python manage.py migrate  # 更新模組
+docker compose exec web python manage.py createsuperuser # 建立管理者權限
+docker compose exec web pytest # 執行測試文件
 ```
 
 # 快速開始
@@ -68,7 +87,7 @@ source venv/bin/activate     # Mac/Linux
 
 pip install -r requirements.txt
 python manage.py migrate
-python manage.py runserver
+python manage.py runserver 
 deactivate # 離開venv
 ```
 
@@ -97,18 +116,22 @@ GEMINI_MODEL=gemini-2.0-flash
 
 ### 後端
 - Python 3.12
-- Django 5.0 + Django REST Framework
-- PostgreSQL 15
-- JWT 認證（djangorestframework-simplejwt）
+- Django 
+- Django REST Framework
+- PostgreSQL
+- JWT Authentication
 - drf-spectacular（OpenAPI 3.0 自動文件）
 
 ### AI
 - OpenAI API（GPT-4o-mini）
 - Google Gemini API（Gemini 2.0 Flash）
-- 工廠模式 + 抽象介面設計
+- Factory Pattern(工廠模式)
+- 抽象Service Interface
 
 ### DevOps
-- Docker + Docker Compose + DockerHub
+- Docker
+- Docker Compose
+- DockerHub
 - GitHub Actions CI/CD
 
 ---

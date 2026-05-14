@@ -41,6 +41,7 @@ pip install google-genai # 更新 gemini套件
 pip install debugpy # Debug套件
 pip install celery # 非同步任務佇列
 pip install celery redis 
+pip install pytest pytest-django pytest-cov factory-boy faker freezegun # 安裝測試工具
 
 # 產生依賴紀錄.txt
 pip freeze > requirements.txt # 每次安裝新套件都要執行一次，確保其他環境也可以保持一樣的環境
