@@ -1,5 +1,6 @@
 import json
 import logging
+import base64
 from openai import OpenAI
 from decouple import config
 from .base import BaseAIService, NutritionAnalysisResult, DietaryAdviceResult
@@ -35,6 +36,34 @@ class OpenAIService(BaseAIService):
             ],
             temperature=0.7,
             max_tokens=1000,
+            response_format={"type": "json_object"}
+        )
+        return response.choices[0].message.content
+    
+    def _do_call_vision_api(self, image_data: bytes, mime_type: str) -> str:
+        """OpenAI Vision: 圖片轉 base64 後包進 JSON 傳送"""
+        b64_image = base64.b64decode(image_data).decode('utf-8')
+        response = self.client.chat.completions.create(
+            model='gpt-4o',
+            messages=[
+                {
+                    "role": "user",
+                    "content":[
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{b64_image}",
+                                "detail": "high"
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": self._build_vision_prompt()
+                        }
+                    ]
+                }
+            ],
+            max_tokens=2000,
             response_format={"type": "json_object"}
         )
         return response.choices[0].message.content
@@ -88,3 +117,4 @@ class OpenAIService(BaseAIService):
         except Exception as e:
             logger.error(f"OpenAI API 呼叫失敗: {e}")
             raise
+        

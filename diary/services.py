@@ -31,9 +31,7 @@ class DiaryService:
 
         normalized_name = food_name.strip().lower()
 
-        # =========================================================
         # L1 Redis Cache
-        # =========================================================
         redis_cached = get_cached_nutrition(normalized_name)
 
         if redis_cached:
@@ -41,9 +39,7 @@ class DiaryService:
 
             return NutritionAnalysisResult(**redis_cached)
 
-        # =========================================================
         # L2 Database Cache
-        # =========================================================
         db_cached = FoodNutritionCache.objects.filter(
             food_name__iexact=normalized_name
         ).first()
@@ -203,5 +199,4 @@ class DiaryService:
             nutrition_score=advice_result.nutrition_score,
             status=AIAnalysis.StatusChoices.COMPLETED,
             ai_model_used=f"{provider}:{service.model_name}",
-
         )

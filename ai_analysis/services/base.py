@@ -1,5 +1,10 @@
+import json
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import List
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class NutritionAnalysisResult:
@@ -26,15 +31,46 @@ class DietaryAdviceResult:
     nutrition_score: int # 營養評分
     raw_response: str
 
+@dataclass
+class FoodComponent:
+    """
+    圖片辨識出的食物成份
+    """
+    name: str
+    portion_description: str
+    calories: float
+    protein: float
+    fat: float
+    saturated_fat: float
+    trans_fat: float
+    carbohydrates: float
+    sugar: float
+    sodium: float
+
+@dataclass
+class ImageAnalysisResult:
+    """圖片分析的結果"""
+    components: List[FoodComponent]
+    overall_description: str # 圖片辨識後對內容的描述
+    raw_response: str
+
 
 class BaseAIService(ABC):
 
     @abstractmethod
-    def analyze_food_nutrition(
-        self,
-        food_name: str,
-        portion_description: str = ''
-    ) -> NutritionAnalysisResult:
+    def _call_api(self, prompt:str) -> str:
+        """
+        
+        """
+        pass
+
+    @abstractmethod
+    def _do_call_vision_api(self, image_data: bytes, mime_type: set) -> str:
+        """"""
+        pass
+
+    @abstractmethod
+    def analyze_food_nutrition(self, food_name: str, portion_description: str = '') -> NutritionAnalysisResult:
         """
         分析食物營養素
         輸入:食物名稱 + 份量描述
@@ -43,16 +79,54 @@ class BaseAIService(ABC):
         pass
 
     @abstractmethod
-    def give_dietary_advice(
-        self,
-        diary_entry_data: dict,
-        user_profile: dict,
-        daily_needs: dict
-    ) -> DietaryAdviceResult:
+    def give_dietary_advice(self, diary_entry_data: dict, user_profile: dict, daily_needs: dict) -> DietaryAdviceResult:
         """
         根據這餐的營養素 + 使用者資料 給出建議
         """
         pass
+
+    def analyze_food_image(self, image_data: bytes, mime_type: str) -> ImageAnalysisResult:
+        """
+        圖片辨識主流成，所有 provider 共用
+        子類別只需要做 _do_call_vision_api
+        """
+        raw_text = self._call_vision_api(image_data, mime_type)
+        return self._parse_image_result(raw_text)
+
+    def _call_vision_api(self, image_data: bytes, mime_type: str) -> str:
+        logger.info(f"[{self.__class__.__name__}] 圖片辨識開始")
+        try:
+            raw_text = self._do_call_vision_api(image_data, mime_type)
+            logger.info(f"[{self.__class__.__name__}] 圖片辨識完成")
+            return raw_text
+        except Exception as e:
+            logger.error(f"[{self.__class__.__name__}] 圖片辨識失敗: {e}")
+            raise
+
+    def _parse_image_result(self, raw_text: str) -> ImageAnalysisResult:
+        """圖片辨識結果解析，所有子類別共用"""
+        parsed = json.loads(raw_text)
+        components = [
+            FoodComponent(
+                name=c.get('name', '未知食物'),
+                portion_description=c.get('portion_description', ''),
+                calories=float(c.get('calories', 0)),
+                protein=float(c.get('protein', 0)),
+                fat=float(c.get('fat', 0)),
+                saturated_fat=float(c.get('saturated_fat', 0)), 
+                trans_fat=float(c.get('trans_fat', 0)),
+                carbohydrates=float(c.get('carbohydrates', 0)),
+                sugar=float(c.get('sugar', 0)),
+                sodium=float(c.get('sodium', 0)),
+
+            )
+            for c in parsed.get('components', [])
+        ]
+        return ImageAnalysisResult(
+            components=components,
+            overall_description=parsed.get('overall_description', ''),
+            raw_response=raw_text
+        )
 
     def _build_nutrition_prompt(self, food_name: str, portion_description: str) -> str:
         portion_text = f"，份量：{portion_description}" if portion_description else ""
@@ -122,3 +196,31 @@ class BaseAIService(ABC):
     "nutrition_score": 評分數字
 }}"""
     
+    def _build_vision_prompt(self) -> str:
+        return """你是一位專業的營養師和食物辨識專家。
+請仔細分析這張食物照片，辨別出所有可見的食物成份。
+
+請嚴格用以下 JSON 格式回覆 (只回覆 JSON):
+{
+    "overall_description": "對整體食物的描述，例如：雞肉飯便當，含白飯、雞肉絲、醃蘿蔔",
+    "components": [
+        {
+            "name": "食物名稱，例如：白飯",
+            "portion_description": "估算份量，例如:約150g",
+            "calories": 熱量數字,
+            "protein": 蛋白質克數,
+            "fat": 脂肪克數,
+            "saturated_fat": 飽和脂肪克數,
+            "trans_fat": 反式脂肪克數,
+            "carbohydrates": 碳水化合物克數,
+            "sugar": 糖克數,
+            "sodium": 鈉毫克數
+        }
+    ]
+}
+
+注意:
+- 每個可見的食物成份都需要單獨列出
+- 份量請根據照片中的視覺比例估算
+- 如果看不清楚某個成份，給出合理估算值
+"""

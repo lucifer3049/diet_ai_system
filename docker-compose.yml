@@ -1,8 +1,6 @@
-# docker-compose.yml
-
 services:
 
-  # ── Django Web Server ─────────────────────────
+  # Django 的設定 
   web:
     build: .                          # 用當前目錄的 Dockerfile 建立
     container_name: diet-ai-web
@@ -25,9 +23,9 @@ services:
       redis:
         condition: service_healthy    # 等 Redis 健康檢查通過才啟動
 
-  # ── PostgreSQL ────────────────────────────────
+  # PostgreSQL的設定
   db:
-    image: postgres:15                # 直接用官方 PostgreSQL image，不需要自己寫 Dockerfile
+    image: postgres:15               
     container_name: diet-ai-db
     volumes:
       - postgres_data:/var/lib/postgresql/data   # 資料持久化，容器刪掉資料不會不見
