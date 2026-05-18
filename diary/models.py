@@ -56,3 +56,30 @@ class DiaryEntry(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.date} - {self.get_meal_type_display()}"
     
+
+class DiaryComponent(models.Model):
+    """
+    圖片辨識後分解出食物成分
+    DiaryEntry對應多個 Component
+    """
+
+    diary_entry = models.ForeignKey(DiaryEntry, on_delete=models.CASCADE, related_name='components', help_text="所屬日記", verbose_name="日記所屬")
+    food_name = models.CharField(max_length=200, help_text="成分名稱，例如:雞肉絲、白飯", verbose_name="食物名稱")
+    portion_description = models.CharField(max_length=200, blank=True, help_text="預估份量", verbose_name="預估份量")
+    calories = models.DecimalField(max_digits=8, decimal_places=2, default=0, verbose_name="卡路里")
+    protein = models.DecimalField(max_digits=7, decimal_places=2, default=0, verbose_name="蛋白質")
+    fat = models.DecimalField(max_digits=7, decimal_places=2, default=0, verbose_name="脂肪")
+    saturated_fat = models.DecimalField(max_digits=7, decimal_places=2, default=0, verbose_name="飽和脂肪")
+    trans_fat = models.DecimalField(max_digits=7, decimal_places=2, default=0, verbose_name="反式脂肪")
+    carbohydrates = models.DecimalField(max_digits=7, decimal_places=2, default=0, verbose_name="碳水化合物")
+    sugar = models.DecimalField(max_digits=7, decimal_places=2, default=0, verbose_name="糖")
+    sodium = models.DecimalField(max_digits=8, decimal_places=2, default=0, verbose_name="納")
+
+    source = models.CharField(max_length=20, choices=[('ai_vision', 'AI視覺辨識'), ('ai_text', 'AI文字分析'), ('cache', '快取')])
+
+    class Meta:
+        db_table = 'diary_components'
+        verbose_name = '食物成份明細'
+
+        def __str__(self):
+            return f"{self.diary_entry_id} - {self.food_name}"

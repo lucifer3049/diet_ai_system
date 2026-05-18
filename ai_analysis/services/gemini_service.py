@@ -29,6 +29,22 @@ class GeminiService(BaseAIService):
         )
         return response.text
     
+    def _do_call_vision_api(self, image_data: bytes, mime_type: str) -> str:
+        """Gemini Vision: 原始 bytes 直接透過 Part 物件傳送"""
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=[
+                types.Part.from_bytes(data=image_data, mime_type=mime_type),
+                types.Part.from_text(text=self._build_vision_prompt()),
+            ],
+            config=types.GenerateContentConfig(
+                response_mime_type='application/json',
+                temperature=0.4,
+            )
+        )
+        return response.text
+       
+    
     def analyze_food_nutrition(self, food_name: str, portion_description: str = '') -> NutritionAnalysisResult:
         prompt = self._build_nutrition_prompt(food_name, portion_description)
         
@@ -78,4 +94,4 @@ class GeminiService(BaseAIService):
         except Exception as e:
             logger.error(f"Gemini API 呼叫失敗: {e}")
             raise
-        
+    
