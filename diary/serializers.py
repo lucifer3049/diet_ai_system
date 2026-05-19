@@ -1,11 +1,22 @@
 from rest_framework import serializers
-from .models import DiaryEntry
+from .models import DiaryEntry, DiaryComponent
 
+class DiaryComponentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DiaryComponent
+        fields = [
+            'id', 'food_name', 'portion_description',
+            'calories', 'protein', 'fat', 'saturated_fat',
+            'trans_fat', 'carbohydrates', 'sugar', 'sodium',
+            'source',
+        ]
+        read_only_fields = fields
 
 class DiaryEntrySerializer(serializers.ModelSerializer):
 
     meal_type_display = serializers.CharField(source='get_meal_type_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    components = DiaryComponentSerializer(many=True, read_only=True)
 
     class Meta:
         model = DiaryEntry
@@ -15,6 +26,7 @@ class DiaryEntrySerializer(serializers.ModelSerializer):
             'calories', 'protein', 'fat', 'saturated_fat',
             'trans_fat', 'carbohydrates', 'sugar', 'sodium',
             'status', 'status_display',
+            'components',
             'created_at',
         ]
         read_only_fields = [
