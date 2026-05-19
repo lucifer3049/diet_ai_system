@@ -195,3 +195,113 @@ class TestAnalyzeDiaryEntry:
         # give_dietary_advice 仍應被呼叫
         mock_ai_service.give_dietary_advice.assert_called_once()
         
+
+@pytest.mark.django_db
+class TestAnalyzeDiaryImage:
+
+    @pytest.fixture
+    def diary_with_image(self, user):
+        """建立帶有假圖片的 DiaryEntry"""
+        from django.core.files.base import ContentFile
+
+        diary = DiaryEntryFactory(user=user, food_name='便當')
+
+        tiny_jpeg = (
+            b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00'
+            b'\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t'
+            b'\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a'
+            b'\x1f\x1e\x1d\x1a\x1c\x1c $.\' ",#\x1c\x1c(7),01444\x1f\'9=82<.342\x1e'
+            b'\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00'
+            b'\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00'
+            b'\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08'
+            b'\t\n\x0b\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xf5\x0a\xff\xd9'
+        )
+        diary.image.save('test.jpg', ContentFile(tiny_jpeg))
+
+        return diary
+
+    def test_creates_diary_components(self, diary_with_image):
+        """
+        圖片辨識後應建立對應的 DiaryComponent 紀錄
+        """
+        from ai_analysis.services.base import ImageAnalysisResult, FoodComponent
+
+        mock_result = ImageAnalysisResult(
+            components=[
+                FoodComponent(
+                    name='白飯', portion_description='150g',
+                    calories=200, protein=4, fat=0.5,
+                    saturated_fat=0, trans_fat=0,
+                    carbohydrates=44, sugar=0, sodium=2,
+                ),
+                FoodComponent(
+                    name='雞腿', portion_description='1支',
+                    calories=350, protein=26, fat=19,
+                    saturated_fat=5, trans_fat=0,
+                    carbohydrates=0, sugar=0, sodium=400,
+                ),
+            ],
+            overall_description='雞腿便當',
+            raw_response='{"mock": true}',
+        )
+
+        mock_service = MagicMock()
+        mock_service.analyze_food_image.return_value = mock_result
+
+        with patch('diary.services.get_ai_service', return_value=mock_service):
+            DiaryService.analyze_diary_image(diary_with_image)
+        
+        from diary.models import DiaryComponent
+        components = DiaryComponent.objects.filter(diary_entry=diary_with_image)
+        assert components.count() == 2
+        assert components.filter(food_name='白飯').exists()
+        assert components.filter(food_name='雞腿').exists()
+
+    def test_aggregates_nutrition_correctly(self, diary_with_image):
+        """
+        components 的營養成分加總填入正確的 DiaryEntry
+        """
+        from ai_analysis.services.base import ImageAnalysisResult, FoodComponent
+
+        mock_result = ImageAnalysisResult(
+            components=[
+                FoodComponent('白飯', '150g', 200, 4, 0.5, 0, 0, 44, 0, 2),
+                FoodComponent('雞腿', '1支', 350, 26, 19, 5, 0, 0, 0, 400),
+            ],
+            overall_description='雞腿便當',
+            raw_response='{}',
+        )
+
+        mock_service = MagicMock()
+        mock_service.analyze_food_image.return_value = mock_result
+
+        with patch('diary.services.get_ai_service', return_value=mock_service):
+            DiaryService.analyze_diary_image(diary_with_image)
+
+        diary_with_image.refresh_from_db()
+        assert float(diary_with_image.calories) == 550.0
+        assert float(diary_with_image.protein) == 30.0
+        assert diary_with_image.status == DiaryEntry.StatusChoices.COMPLETED
+
+    def test_rollback_if_save_fails(self, diary_with_image):
+        """aggregate 失敗時，components 不應被保留 (atomic 保證)"""
+
+        from ai_analysis.services.base import ImageAnalysisResult, FoodComponent
+
+        mock_result = ImageAnalysisResult(
+            components=[FoodComponent('白飯', '', 200, 4, 0.5, 0, 0, 44, 0, 2)],
+            overall_description='',
+            raw_response='{}',
+        )
+
+        mock_service = MagicMock()
+        mock_service.analyze_food_image.return_value = mock_result
+
+        with patch('diary.services.get_ai_service', return_value=mock_service):
+            with patch.object(DiaryService, '_aggregate_to_diary', side_effect=Exception("DB error")):
+                with pytest.raises(Exception):
+                    DiaryService.analyze_diary_image(diary_with_image)
+
+        from diary.models import DiaryComponent
+        assert DiaryComponent.objects.filter(diary_entry=diary_with_image).count() == 0
+

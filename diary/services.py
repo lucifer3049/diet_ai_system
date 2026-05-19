@@ -1,11 +1,15 @@
 import logging
-from .models import DiaryEntry
+import mimetypes
+from .models import DiaryEntry, DiaryComponent
 from nutrition.models import FoodNutritionCache
 from ai_analysis.models import AIAnalysis
 from ai_analysis.services import get_ai_service
-from ai_analysis.services.base import NutritionAnalysisResult
+from ai_analysis.services.base import NutritionAnalysisResult, ImageAnalysisResult
 from nutrition.cache import get_cached_nutrition, set_cached_nutrition
 from dataclasses import asdict
+from decimal import Decimal
+from django.db import transaction
+
 
 logger = logging.getLogger(__name__)
 
@@ -200,3 +204,88 @@ class DiaryService:
             status=AIAnalysis.StatusChoices.COMPLETED,
             ai_model_used=f"{provider}:{service.model_name}",
         )
+
+    @classmethod
+    def analyze_diary_image(cls, diary_entry: DiaryEntry) -> None:
+        """
+        圖片辨識功能:
+        1. 讀取圖片 bytes
+        2. 呼叫 AI Vision API
+        3. 建立 DiaryComponent 紀錄
+        4. 彙總營養素 -> 更新 DiaryEntry
+        5. 更新狀態為 COMPLETED
+
+        用 transaction.atomic 確保資料一致性:
+        components 全部建立成功 + DiaryEntry 更新，才算完成，只要其中一步失敗，全部 rollback
+        """
+        user = diary_entry.user
+        provider = user.preferred_ai_provider
+        service = get_ai_service(provider)
+
+        # 讀取圖片
+        imager_data, mime_type = cls._read_image(diary_entry)
+
+        # 呼叫 AI
+        image_result = service.analyze_food_image(imager_data, mime_type)
+
+        # atomic 寫入，確保 components + DiaryEntry 同步完成
+        with transaction.atomic():
+            cls._save_components(diary_entry, image_result, provider)
+            cls._aggregate_to_diary(diary_entry, image_result)
+
+    @staticmethod
+    def _read_image(diary_entry: DiaryEntry) -> tuple[bytes, str]:
+        """
+        從 ImageField 讀取原始 bytes 和 mime type
+        """
+        image_field = diary_entry.image
+        mime_type, _ =mimetypes.guess_type(image_field.name)
+        mime_type = mime_type or 'image/jpeg'
+
+        with image_field.open('rb') as f:
+            return f.read(), mime_type
+
+    @staticmethod
+    def _save_components(diary_entry: DiaryEntry, image_result: ImageAnalysisResult,provider: str,) -> None:
+        """
+        批次建立 DiaryComponent
+        用bulk_create 而不是逐筆 建立"
+        10 個食物成份 = 1 次 INSERT，不是10次
+        """
+        components = [
+            DiaryComponent(
+                diary_entry=diary_entry,
+                food_name=comp.name,
+                portion_description=comp.portion_description,
+                calories=Decimal(str(comp.calories)),
+                protein=Decimal(str(comp.protein)),
+                fat=Decimal(str(comp.fat)),
+                saturated_fat=Decimal(str(comp.saturated_fat)),
+                trans_fat=Decimal(str(comp.trans_fat)),
+                carbohydrates=Decimal(str(comp.carbohydrates)),
+                sugar=Decimal(str(comp.sugar)),
+                sodium=Decimal(str(comp.sodium)),
+                source='ai_vision',
+            )
+            for comp in image_result.components
+        ]
+        DiaryComponent.objects.bulk_create(components)
+
+    @staticmethod
+    def _aggregate_to_diary(diary_entry: DiaryEntry, image_result: ImageAnalysisResult,) -> None:
+        """
+        將所有 components 的營養成份加總，填入DiaryEntry
+        """
+        def _sum(field: str) -> Decimal:
+            return Decimal(str(sum(getattr(c, field, 0) for c in image_result.components)))
+        
+        diary_entry.calories = _sum('calories')
+        diary_entry.protein = _sum('protein')
+        diary_entry.fat = _sum('fat')
+        diary_entry.saturated_fat = _sum('saturated_fat')
+        diary_entry.trans_fat = _sum('trans_fat')
+        diary_entry.carbohydrates = _sum('carbohydrates')
+        diary_entry.sugar = _sum('sugar')
+        diary_entry.sodium = _sum('sodium')
+        diary_entry.status = DiaryEntry.StatusChoices.COMPLETED
+        diary_entry.save()
