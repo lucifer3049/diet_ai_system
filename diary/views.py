@@ -31,7 +31,7 @@ class DiaryEntryViewSet(viewsets.ModelViewSet):
         diary_entry = serializer.save(user=self.request.user)
 
         if diary_entry.image:
-            analyze_diary_image_task.dalay(diary_entry.id)
+            analyze_diary_image_task.delay(diary_entry.id)
             logger.info(f"已排程圖片辨識，diary_id={diary_entry.id}")
         else:
             # 非同步:丟給 Celery，立刻回傳，不用等待分析完成
