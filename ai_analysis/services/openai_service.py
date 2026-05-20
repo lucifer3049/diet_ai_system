@@ -42,7 +42,7 @@ class OpenAIService(BaseAIService):
     
     def _do_call_vision_api(self, image_data: bytes, mime_type: str) -> str:
         """OpenAI Vision: 圖片轉 base64 後包進 JSON 傳送"""
-        b64_image = base64.b64decode(image_data).decode('utf-8')
+        b64_image = base64.b64encode(image_data).decode('utf-8')
         response = self.client.chat.completions.create(
             model='gpt-4o',
             messages=[

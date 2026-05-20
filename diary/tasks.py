@@ -44,6 +44,7 @@ def analyze_diary_entry_task(self, diary_entry_id: int):
         DiaryEntry.objects.filter(id=diary_entry_id).update(status=DiaryEntry.StatusChoices.FAILED)
         raise self.retry(exc=exc)
 
+@shared_task(bind=True, max_retries=2, default_retry_delay=60,)
 def analyze_diary_image_task(self, diary_entry_id: int):
     """
     圖片辨識 task，與文字分析 task 分開的原因:
