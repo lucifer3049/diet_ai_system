@@ -223,10 +223,10 @@ class DiaryService:
         service = get_ai_service(provider)
 
         # 讀取圖片
-        imager_data, mime_type = cls._read_image(diary_entry)
+        image_data, mime_type = cls._read_image(diary_entry)
 
         # 呼叫 AI
-        image_result = service.analyze_food_image(imager_data, mime_type)
+        image_result = service.analyze_food_image(image_data, mime_type)
 
         # atomic 寫入，確保 components + DiaryEntry 同步完成
         with transaction.atomic():
@@ -265,7 +265,7 @@ class DiaryService:
                 carbohydrates=Decimal(str(comp.carbohydrates)),
                 sugar=Decimal(str(comp.sugar)),
                 sodium=Decimal(str(comp.sodium)),
-                source='ai_vision',
+                source=DiaryComponent.SourceChoices.AI_VISION,
             )
             for comp in image_result.components
         ]

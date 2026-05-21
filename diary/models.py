@@ -75,11 +75,21 @@ class DiaryComponent(models.Model):
     sugar = models.DecimalField(max_digits=7, decimal_places=2, default=0, verbose_name="糖")
     sodium = models.DecimalField(max_digits=8, decimal_places=2, default=0, verbose_name="納")
 
-    source = models.CharField(max_length=20, choices=[('ai_vision', 'AI視覺辨識'), ('ai_text', 'AI文字分析'), ('cache', '快取')])
+    class SourceChoices(models.TextChoices):
+        AI_VISION = 'ai_vision', 'AI視覺辨識'
+        AI_TEXT   = 'ai_text',   'AI文字分析'
+        CACHE     = 'cache',     '快取'
+
+    source = models.CharField(
+        max_length=20,
+        choices=SourceChoices.choices,
+        default=SourceChoices.AI_VISION,
+    )
 
     class Meta:
         db_table = 'diary_components'
         verbose_name = '食物成份明細'
+        verbose_name_plural = '食物成份明細'
 
-        def __str__(self):
-            return f"{self.diary_entry_id} - {self.food_name}"
+    def __str__(self) -> str:
+        return f"{self.food_name} (日記#{self.diary_entry_id})"

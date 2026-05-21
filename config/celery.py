@@ -2,7 +2,7 @@ import os
 from celery import Celery
 
 # 設定Django使用哪個 Django 設定
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.development')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
 app = Celery('diet_ai_system')
 
