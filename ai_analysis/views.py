@@ -38,21 +38,26 @@ class AnalyzeDiaryView(APIView):
 
     def post(self, request, diary_id):
         diary_entry = get_object_or_404(
-            DiaryEntry,
+            DiaryEntry.objects.select_related('ai_analysis'),
             id=diary_id,
             user=request.user
         )
 
         # 已有結果值截回傳，不需要進task
-        if hasattr(diary_entry, 'ai_analysis'):
-            return Response(AIAnalysisSerializer(diary_entry.ai_analysis).data, status=status.HTTP_200_OK)
-        
-        #檢查狀態
-        if diary_entry.status == DiaryEntry.StatusChoices.PENDING:
-            return Response({"error": "營養成分分析尚未完成，請稍後在試"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        if diary_entry.status == DiaryEntry.StatusChoices.FAILED:
-            return Response({"error": "日誌的營養成分分析失敗，無法給予飲食建議。"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            analysis = diary_entry.ai_analysis
+            return Response(AIAnalysisSerializer(analysis).data, status=status.HTTP_200_OK)
+        except DiaryEntry.ai_analysis.RelatedObjectDoesNotExist:
+            pass
+
+        # 只有 COMPLETED（且無 ai_analysis）才允許觸發建議分析；其餘狀態都不行
+        non_ready_statuses = {
+            DiaryEntry.StatusChoices.PENDING: "營養成分分析尚未完成，請稍後再試",
+            DiaryEntry.StatusChoices.PROCESSING: "目前正在分析中，請稍後再試",
+            DiaryEntry.StatusChoices.FAILED: "日誌的營養成分分析失敗，無法給予飲食建議。",
+        }
+        if diary_entry.status in non_ready_statuses:
+            return Response({"error": non_ready_statuses[diary_entry.status]}, status=status.HTTP_400_BAD_REQUEST)
         
 
         # 三層優先順序:

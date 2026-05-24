@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from .fields import EncryptedCharField
 
 class User(AbstractUser):
     """
@@ -30,11 +31,23 @@ class User(AbstractUser):
     goal = models.CharField(max_length=20, choices=GoalChoices.choices, default=GoalChoices.MAINTAIN,verbose_name="目標", help_text="目標")
    
     preferred_ai_provider = models.CharField(
-        max_length=20, 
-        choices=AIProviderChoices.choices, 
-        default=AIProviderChoices.OPENAI, 
-        verbose_name="偏好的AI模型提供者", 
-        help_text="偏好的AI模型提供者"
+        max_length=20,
+        choices=AIProviderChoices.choices,
+        default=AIProviderChoices.OPENAI,
+        verbose_name="偏好的AI模型提供者",
+        help_text="偏好的AI模型提供者",
+    )
+
+    # 使用者自帶的 AI API Key（加密存放，優先於伺服器 .env）
+    openai_api_key = EncryptedCharField(null=True, blank=True, verbose_name="OpenAI API Key")
+    gemini_api_key = EncryptedCharField(null=True, blank=True, verbose_name="Gemini API Key")
+
+    # 每個 Provider 偏好的模型名稱
+    preferred_openai_model = models.CharField(
+        max_length=100, default='gpt-4o-mini', verbose_name="偏好的 OpenAI 模型"
+    )
+    preferred_gemini_model = models.CharField(
+        max_length=100, default='gemini-2.5-flash', verbose_name="偏好的 Gemini 模型"
     )
 
     # 時間記錄
@@ -102,12 +115,30 @@ class User(AbstractUser):
         return {
             'calories': calories,
             'protein': round(weight * 1.6),                 # 每公斤體重 1.6g 蛋白質
-            'fat': round(calories * 0.25 / 9),              # 每公升體重 0.25g 脂肪     
+            'fat': round(calories * 0.25 / 9),              # 每公升體重 0.25g 脂肪
             'saturated_fat': round(calories * 0.07 / 9),    # 每公升體重 0.07g 飽和脂肪
             'carbohydrates': round(calories * 0.5 / 4),     # 每公升體重 0.5g 碳水化合物
             'sugar': round(calories * 0.1 / 4),             # 每公升體重 0.1g 糖分
             'sodium': 2300,                                # WHO建議每天鈉攝取量不超過 2300mg
         }
 
+    def get_api_key(self, provider: str) -> str | None:
+        """使用者自帶 key 優先；無則 fallback 到伺服器 .env"""
+        from decouple import config as env_config
+        user_key = getattr(self, f'{provider}_api_key', None)
+        return user_key or env_config(f'{provider.upper()}_API_KEY', default=None)
 
-        
+    def get_preferred_model(self, provider: str) -> str:
+        """回傳該 provider 的偏好模型名稱"""
+        return getattr(self, f'preferred_{provider}_model', None)
+
+    def to_ai_profile(self) -> dict:
+        """整理傳給 AI 的使用者基本資料"""
+        return {
+            'gender': self.get_gender_display() if self.gender else '未提供',
+            'age': self.age,
+            'height': float(self.height) if self.height else None,
+            'weight': float(self.weight) if self.weight else None,
+            'bmi': self.bmi,
+            'goal': self.get_goal_display(),
+        }

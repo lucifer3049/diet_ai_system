@@ -38,7 +38,7 @@ class DiaryEntry(models.Model):
     trans_fat = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, help_text="AI分析反式脂肪 (g)")
     carbohydrates = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, help_text="AI分析碳水化合物 (g)")
     sugar = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, help_text="AI分析糖 (g)")
-    sodium = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="AI分析納 (g)")
+    sodium = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="AI分析鈉 (mg)")
 
     
     created_at = models.DateTimeField(auto_now_add=True, help_text="建立時間")
@@ -73,7 +73,7 @@ class DiaryComponent(models.Model):
     trans_fat = models.DecimalField(max_digits=7, decimal_places=2, default=0, verbose_name="反式脂肪")
     carbohydrates = models.DecimalField(max_digits=7, decimal_places=2, default=0, verbose_name="碳水化合物")
     sugar = models.DecimalField(max_digits=7, decimal_places=2, default=0, verbose_name="糖")
-    sodium = models.DecimalField(max_digits=8, decimal_places=2, default=0, verbose_name="納")
+    sodium = models.DecimalField(max_digits=8, decimal_places=2, default=0, verbose_name="鈉")
 
     class SourceChoices(models.TextChoices):
         AI_VISION = 'ai_vision', 'AI視覺辨識'

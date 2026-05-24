@@ -1,40 +1,56 @@
-# .gitignore
-cat > .gitignore << 'EOF'
 # Python
 __pycache__/
 *.py[cod]
 *.egg-info/
+*.pyo
+*.pyd
 
 # Virtual Environment
 venv/
 env/
+.venv/
 
 # Django
 *.log
 local_settings.py
 db.sqlite3
+test_db.sqlite3
 media/
 staticfiles/
 
 # Environment variables（重要！絕對不能進 git）
 .env
+*.env.local
 
 # Docker
-*.env.local
 docker-compose.override.yml
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Coverage
+.coverage
+htmlcov/
+coverage.xml
+
+# pytest
+.pytest_cache/
 
 # IDE
 .vscode/
 .idea/
 *.swp
-EOF
+*.swo
 
-# Logs
-logs/*.log
-media/
+# Claude Code 本地設定
+.claude/
 
 # OS
 .DS_Store
 Thumbs.db
 
-.coverage
+# 使用者上傳的圖片（runtime 資料，不應進 git）
+diary_images/
+
+CLAUDE.md

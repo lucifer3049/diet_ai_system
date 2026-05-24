@@ -5,12 +5,7 @@ from diary.models import DiaryEntry
 class AIAnalysis(models.Model):
     """ AI 分析結果 """
 
-
-    class StatusChoices(models.TextChoices):
-        PENDING = 'pending', '待分析'
-        PROCESSING = 'processing', '分析中'
-        COMPLETED = 'completed', '完成'
-        FAILED = 'failed', '失敗'
+    StatusChoices = DiaryEntry.StatusChoices
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ai_analyses', help_text="使用者")
 
@@ -25,7 +20,12 @@ class AIAnalysis(models.Model):
     lacking_nutrients = models.JSONField(default=list, help_text="攝取不足的營養素")
     nutrition_score = models.IntegerField(null=True, blank=True, help_text="營養評分 1-100")
 
-    status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.PENDING, help_text="狀態")
+    status = models.CharField(
+        max_length=20,
+        choices=DiaryEntry.StatusChoices.choices,
+        default=DiaryEntry.StatusChoices.COMPLETED,
+        help_text="狀態",
+    )
     ai_model_used = models.CharField(max_length=50, help_text="使用的 AI 模型")
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -9,19 +9,15 @@ logger = logging.getLogger(__name__)
 
 
 class OpenAIService(BaseAIService):
-    """
-    繼承 BaseAIService，必須使用 analyze_diet 方法
-    """
 
-    def __init__(self):
-        # 透過.env環境變數讀取AI的API KEY 以及使用模型，避免寫死模型
-        self.client = OpenAI(api_key=config('OPENAI_API_KEY'))
-        self.model_name = config('OPENAI_MODEL', default='gpt-4o-mini')
-    
+    def __init__(self, api_key: str | None = None, model: str | None = None):
+        key = api_key or config('OPENAI_API_KEY', default=None)
+        if not key:
+            raise ValueError("OpenAI API key 未設定：請在個人設定填入 API key 或在伺服器 .env 設定 OPENAI_API_KEY")
+        self.client = OpenAI(api_key=key)
+        self.model_name = model or config('OPENAI_MODEL', default='gpt-4o-mini')
+
     def _call_api(self, prompt: str) -> str:
-        """
-        統一 API 呼叫方法，方便未來如果要換模型或調整參數，只需要修改這裡 
-        """
         response = self.client.chat.completions.create(
             model=self.model_name,
             messages=[
@@ -39,16 +35,15 @@ class OpenAIService(BaseAIService):
             response_format={"type": "json_object"}
         )
         return response.choices[0].message.content
-    
+
     def _do_call_vision_api(self, image_data: bytes, mime_type: str) -> str:
-        """OpenAI Vision: 圖片轉 base64 後包進 JSON 傳送"""
         b64_image = base64.b64encode(image_data).decode('utf-8')
         response = self.client.chat.completions.create(
             model='gpt-4o',
             messages=[
                 {
                     "role": "user",
-                    "content":[
+                    "content": [
                         {
                             "type": "image_url",
                             "image_url": {
@@ -70,12 +65,10 @@ class OpenAIService(BaseAIService):
 
     def analyze_food_nutrition(self, food_name: str, portion_description: str = '') -> NutritionAnalysisResult:
         prompt = self._build_nutrition_prompt(food_name, portion_description)
-
         try:
             logger.info(f"OpenAI 分析食物營養: {food_name}")
             raw_text = self._call_api(prompt)
-            parsed = json.loads(raw_text)
-
+            parsed = json.loads(self._clean_json_response(raw_text))
             return NutritionAnalysisResult(
                 calories=float(parsed.get('calories', 0)),
                 protein=float(parsed.get('protein', 0)),
@@ -94,15 +87,13 @@ class OpenAIService(BaseAIService):
         except Exception as e:
             logger.error(f"OpenAI API 呼叫失敗: {e}")
             raise
-    
+
     def give_dietary_advice(self, diary_entry_data: dict, user_profile: dict, daily_needs: dict) -> DietaryAdviceResult:
         prompt = self._build_advice_prompt(diary_entry_data, user_profile, daily_needs)
-
         try:
             logger.info("OpenAI 給予飲食建議")
             raw_text = self._call_api(prompt)
-            parsed = json.loads(raw_text)
-
+            parsed = json.loads(self._clean_json_response(raw_text))
             return DietaryAdviceResult(
                 summary=parsed.get('summary', ''),
                 exceeded_nutrients=parsed.get('exceeded_nutrients', []),
@@ -117,4 +108,3 @@ class OpenAIService(BaseAIService):
         except Exception as e:
             logger.error(f"OpenAI API 呼叫失敗: {e}")
             raise
-        

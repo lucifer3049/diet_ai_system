@@ -1,4 +1,5 @@
 from django.db import models
+from pgvector.django import VectorField
 
 class Food(models.Model):
     """
@@ -76,6 +77,18 @@ class FoodNutritionCache(models.Model):
 
     ai_model_used = models.CharField(max_length=100, help_text="使用的AI模型名稱", blank=True)
     hit_count = models.IntegerField(default=0, help_text="被查詢的次數，作為熱門程度的指標")
+
+    # 資料來源
+    data_source = models.CharField(
+        max_length=20,
+        choices=[('ai', 'AI分析'), ('taiwan_fda', '衛福部FDA'), ('manual', '手動')],
+        default='ai',
+        help_text="營養資料的來源",
+    )
+
+    # pgvector：食物名稱的語意向量，用於 L2.5 語意搜尋
+    # 維度 1536 對應 OpenAI text-embedding-3-small
+    embedding = VectorField(dimensions=1536, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True, help_text="建立時間")
     updated_at = models.DateTimeField(auto_now=True, help_text="更新時間")
