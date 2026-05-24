@@ -1,6 +1,7 @@
 import logging
 import mimetypes
 from .models import DiaryEntry, DiaryComponent
+from .dto import DiaryNutritionDTO
 from nutrition.models import FoodNutritionCache
 from ai_analysis.models import AIAnalysis
 from ai_analysis.services import get_ai_service
@@ -13,10 +14,15 @@ from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
+_NUTRITION_UPDATE_FIELDS = [
+    'calories', 'protein', 'fat', 'saturated_fat',
+    'trans_fat', 'carbohydrates', 'sugar', 'sodium', 'status',
+]
+
 class DiaryService:
     """
     飲食日記邏輯
-    View 只需要呼叫這裡，這裡裡負責處理業務邏輯
+    View 只需要呼叫這裡，這裡負責處理業務邏輯
     """
 
     @staticmethod
@@ -40,7 +46,6 @@ class DiaryService:
 
         if redis_cached:
             logger.info(f"Redis cache hit: {normalized_name}")
-
             return NutritionAnalysisResult(**redis_cached)
 
         # L2 Database Cache
@@ -51,8 +56,9 @@ class DiaryService:
         if db_cached:
             logger.info(f"DB cache hit: {normalized_name}")
 
-            db_cached.hit_count += 1
-            db_cached.save(update_fields=['hit_count', 'updated_at'])
+            FoodNutritionCache.objects.filter(id=db_cached.id).update(
+                hit_count=db_cached.hit_count + 1
+            )
 
             result = NutritionAnalysisResult(
                 calories=float(db_cached.calories),
@@ -68,11 +74,27 @@ class DiaryService:
             )
 
             # 回填 Redis
-            set_cached_nutrition(
-                normalized_name,
-                asdict(result)
-            )
+            set_cached_nutrition(normalized_name, asdict(result))
 
+            return result
+
+        # L2.5 pgvector 語意搜尋（找不到精確快取時，試試語意相似的）
+        from nutrition.vector_service import try_vector_search
+        similar = try_vector_search(normalized_name)
+        if similar:
+            result = NutritionAnalysisResult(
+                calories=float(similar.calories),
+                protein=float(similar.protein),
+                fat=float(similar.fat),
+                saturated_fat=float(similar.saturated_fat),
+                trans_fat=float(similar.trans_fat),
+                carbohydrates=float(similar.carbohydrates),
+                sugar=float(similar.sugar),
+                sodium=float(similar.sodium),
+                food_description=similar.food_description,
+                raw_response='{"source":"vector_cache"}',
+            )
+            set_cached_nutrition(normalized_name, asdict(result))
             return result
 
         logger.info(f"AI API call: {normalized_name}")
@@ -82,38 +104,42 @@ class DiaryService:
             portion_description=portion_description,
         )
 
-        # 存 DB
-        FoodNutritionCache.objects.create(
+        # get_or_create 防止併發重複寫入同一食物
+        cache_obj, created = FoodNutritionCache.objects.get_or_create(
             food_name=normalized_name,
-            calories=nutrition_result.calories,
-            protein=nutrition_result.protein,
-            fat=nutrition_result.fat,
-            saturated_fat=nutrition_result.saturated_fat,
-            trans_fat=nutrition_result.trans_fat,
-            carbohydrates=nutrition_result.carbohydrates,
-            sugar=nutrition_result.sugar,
-            sodium=nutrition_result.sodium,
-            food_description=nutrition_result.food_description,
-            ai_model_used=service.model_name,
+            defaults=dict(
+                calories=nutrition_result.calories,
+                protein=nutrition_result.protein,
+                fat=nutrition_result.fat,
+                saturated_fat=nutrition_result.saturated_fat,
+                trans_fat=nutrition_result.trans_fat,
+                carbohydrates=nutrition_result.carbohydrates,
+                sugar=nutrition_result.sugar,
+                sodium=nutrition_result.sodium,
+                food_description=nutrition_result.food_description,
+                ai_model_used=service.model_name,
+            )
         )
+
+        # 非同步補存 embedding（不阻塞主流程）
+        if created:
+            from nutrition.vector_service import FoodVectorService
+            try:
+                FoodVectorService().store_embedding(cache_obj)
+            except Exception:
+                pass  # embedding 失敗不影響主流程
 
         # 存 Redis
-        set_cached_nutrition(
-            normalized_name,
-            asdict(nutrition_result)
-        )
+        set_cached_nutrition(normalized_name, asdict(nutrition_result))
 
         return nutrition_result
-    
+
     @staticmethod
     def save_nutrition_to_diary(
         diary_entry: DiaryEntry,
         nutrition_result: NutritionAnalysisResult
     ) -> None:
-        """
-        把AI回傳結果存到資料庫
-        只負責存資料
-        """
+        """把AI回傳結果存到資料庫，只更新營養欄位"""
         diary_entry.calories = nutrition_result.calories
         diary_entry.protein = nutrition_result.protein
         diary_entry.fat = nutrition_result.fat
@@ -123,38 +149,17 @@ class DiaryService:
         diary_entry.sugar = nutrition_result.sugar
         diary_entry.sodium = nutrition_result.sodium
         diary_entry.status = DiaryEntry.StatusChoices.COMPLETED
-        diary_entry.save()
+        diary_entry.save(update_fields=_NUTRITION_UPDATE_FIELDS)
 
     @staticmethod
     def build_diary_data(diary_entry: DiaryEntry) -> dict:
         """整理需要傳給AI的資料"""
+        return DiaryNutritionDTO.from_entry(diary_entry).to_dict()
 
-        return {
-            'food_name': diary_entry.food_name,
-            'meal_type': diary_entry.get_meal_type_display(),
-            'portion_description': diary_entry.portion_description,
-            'calories': float(diary_entry.calories or 0),
-            'protein': float(diary_entry.protein or 0),
-            'fat': float(diary_entry.fat or 0),
-            'saturated_fat': float(diary_entry.saturated_fat or 0),
-            'trans_fat': float(diary_entry.trans_fat or 0),
-            'carbohydrates': float(diary_entry.carbohydrates or 0),
-            'sugar': float(diary_entry.sugar or 0),
-            'sodium': float(diary_entry.sodium or 0),
-        }
-    
     @staticmethod
     def build_user_profile(user) -> dict:
         """整理要傳給AI的使用者資料"""
-
-        return {
-            'gender': user.get_gender_display() if user.gender else '未提供',
-            'age': user.age,
-            'height': float(user.height) if user.height else None,
-            'weight': float(user.weight) if user.weight else None,
-            'bmi': user.bmi,
-            'goal': user.get_goal_display(),
-        }
+        return user.to_ai_profile()
 
     @classmethod
     def analyze_diary_entry(cls, diary_entry: DiaryEntry) -> dict:
@@ -170,7 +175,11 @@ class DiaryService:
 
         user = diary_entry.user
         provider = user.preferred_ai_provider
-        service = get_ai_service(provider)
+        service = get_ai_service(
+            provider=provider,
+            api_key=user.get_api_key(provider),
+            model=user.get_preferred_model(provider),
+        )
         food_name = diary_entry.food_name.strip()
 
         # 取得營養資料
@@ -201,7 +210,7 @@ class DiaryService:
             exceeded_nutrients=advice_result.exceeded_nutrients,
             lacking_nutrients=advice_result.lacking_nutrients,
             nutrition_score=advice_result.nutrition_score,
-            status=AIAnalysis.StatusChoices.COMPLETED,
+            status=DiaryEntry.StatusChoices.COMPLETED,
             ai_model_used=f"{provider}:{service.model_name}",
         )
 
@@ -220,7 +229,11 @@ class DiaryService:
         """
         user = diary_entry.user
         provider = user.preferred_ai_provider
-        service = get_ai_service(provider)
+        service = get_ai_service(
+            provider=provider,
+            api_key=user.get_api_key(provider),
+            model=user.get_preferred_model(provider),
+        )
 
         # 讀取圖片
         image_data, mime_type = cls._read_image(diary_entry)
@@ -235,22 +248,24 @@ class DiaryService:
 
     @staticmethod
     def _read_image(diary_entry: DiaryEntry) -> tuple[bytes, str]:
-        """
-        從 ImageField 讀取原始 bytes 和 mime type
-        """
+        """從 ImageField 讀取原始 bytes 和 mime type"""
         image_field = diary_entry.image
-        mime_type, _ =mimetypes.guess_type(image_field.name)
+        mime_type, _ = mimetypes.guess_type(image_field.name)
         mime_type = mime_type or 'image/jpeg'
 
         with image_field.open('rb') as f:
             return f.read(), mime_type
 
     @staticmethod
-    def _save_components(diary_entry: DiaryEntry, image_result: ImageAnalysisResult,provider: str,) -> None:
+    def _save_components(
+        diary_entry: DiaryEntry,
+        image_result: ImageAnalysisResult,
+        provider: str,
+    ) -> None:
         """
         批次建立 DiaryComponent
-        用bulk_create 而不是逐筆 建立"
-        10 個食物成份 = 1 次 INSERT，不是10次
+        用 bulk_create 而不是逐筆建立
+        10 個食物成份 = 1 次 INSERT，不是 10 次
         """
         components = [
             DiaryComponent(
@@ -272,13 +287,14 @@ class DiaryService:
         DiaryComponent.objects.bulk_create(components)
 
     @staticmethod
-    def _aggregate_to_diary(diary_entry: DiaryEntry, image_result: ImageAnalysisResult,) -> None:
-        """
-        將所有 components 的營養成份加總，填入DiaryEntry
-        """
+    def _aggregate_to_diary(
+        diary_entry: DiaryEntry,
+        image_result: ImageAnalysisResult,
+    ) -> None:
+        """將所有 components 的營養成份加總，填入 DiaryEntry"""
         def _sum(field: str) -> Decimal:
             return Decimal(str(sum(getattr(c, field, 0) for c in image_result.components)))
-        
+
         diary_entry.calories = _sum('calories')
         diary_entry.protein = _sum('protein')
         diary_entry.fat = _sum('fat')
@@ -288,4 +304,6 @@ class DiaryService:
         diary_entry.sugar = _sum('sugar')
         diary_entry.sodium = _sum('sodium')
         diary_entry.status = DiaryEntry.StatusChoices.COMPLETED
-        diary_entry.save()
+        diary_entry.save(update_fields=_NUTRITION_UPDATE_FIELDS)
+
+

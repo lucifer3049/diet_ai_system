@@ -10,6 +10,14 @@ DATABASES = {
     }
 }
 
+# 測試環境用的記憶體快取，不依賴Redis
+CACHES = {
+    'default':{
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'test-cache',
+    }
+}
+
 # 測試時關閉 AI 呼叫（用假的 key）
 OPENAI_API_KEY = 'test-key'
 GEMINI_API_KEY = 'test-key'

@@ -23,9 +23,9 @@ services:
       redis:
         condition: service_healthy    # 等 Redis 健康檢查通過才啟動
 
-  # PostgreSQL的設定
+  # PostgreSQL + pgvector extension
   db:
-    image: postgres:15               
+    image: pgvector/pgvector:pg15
     container_name: diet-ai-db
     volumes:
       - postgres_data:/var/lib/postgresql/data   # 資料持久化，容器刪掉資料不會不見
@@ -80,7 +80,10 @@ services:
     env_file:
       - .env
     depends_on:
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.development
 

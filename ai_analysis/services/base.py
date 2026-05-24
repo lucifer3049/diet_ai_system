@@ -103,9 +103,18 @@ class BaseAIService(ABC):
             logger.error(f"[{self.__class__.__name__}] 圖片辨識失敗: {e}")
             raise
 
+    @staticmethod
+    def _clean_json_response(raw_text: str) -> str:
+        """去除 AI 可能包裹的 markdown code fence（```json ... ```）"""
+        text = raw_text.strip()
+        if text.startswith('```'):
+            text = text.split('\n', 1)[-1]
+            text = text.rsplit('```', 1)[0]
+        return text.strip()
+
     def _parse_image_result(self, raw_text: str) -> ImageAnalysisResult:
         """圖片辨識結果解析，所有子類別共用"""
-        parsed = json.loads(raw_text)
+        parsed = json.loads(self._clean_json_response(raw_text))
         components = [
             FoodComponent(
                 name=c.get('name', '未知食物'),

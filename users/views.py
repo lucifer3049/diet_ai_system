@@ -1,7 +1,7 @@
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
-from .serializers import RegisterSerializer, UserProfileSerializer
+from .serializers import RegisterSerializer, UserProfileSerializer, UserAISettingsSerializer, UserAISettingsUpdateSerializer
 from .models import User
 
 @extend_schema(tags=['認證'])
@@ -87,4 +87,36 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         這是 /me/ 端點的核心邏輯
         """
         return self.request.user
+
+
+@extend_schema(tags=['使用者'])
+class UserAISettingsView(generics.RetrieveUpdateAPIView):
+    """
+    GET  /api/v1/users/me/settings/  → 取得 AI 設定（key 遮罩）
+    PATCH /api/v1/users/me/settings/ → 更新 API key / 偏好模型
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'patch']
+
+    def get_serializer_class(self):
+        if self.request.method == 'PATCH':
+            return UserAISettingsUpdateSerializer
+        return UserAISettingsSerializer
+
+    def get_object(self):
+        return self.request.user
+
+    @extend_schema(
+        summary="取得 AI 設定",
+        description="回傳使用者的 AI provider、偏好模型與 API key（只顯示後 6 碼）",
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @extend_schema(
+        summary="更新 AI 設定",
+        description="更新偏好 provider、模型名稱，或設定/刪除自帶的 API key。傳 null 可清除已儲存的 key。",
+    )
+    def patch(self, request, *args, **kwargs):
+        return super().patch(request, *args, **kwargs)
 

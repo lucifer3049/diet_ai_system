@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView # 內建API
 from drf_spectacular.utils import extend_schema
-from .views import RegisterView, UserProfileView
+from .views import RegisterView, UserProfileView, UserAISettingsView
 
 
 # 用 extend_schema 補充 simplejwt的文件說明
@@ -25,5 +25,6 @@ urlpatterns = [
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'), # 刷新token
 
     # 使用者資料
-    path('users/me/', UserProfileView.as_view(), name='user-profile'), # 使用者
+    path('users/me/', UserProfileView.as_view(), name='user-profile'),
+    path('users/me/settings/', UserAISettingsView.as_view(), name='user-ai-settings'),
 ]

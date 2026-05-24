@@ -7,18 +7,17 @@ from .base import BaseAIService, NutritionAnalysisResult, DietaryAdviceResult
 
 logger = logging.getLogger(__name__)
 
-class GeminiService(BaseAIService):
-    """
-    Gemini AI 與 OpenAI 一樣的介面，但底層用gemini API
-    """
 
-    def __init__(self):
-        self.client = genai.Client(api_key=config('GEMINI_API_KEY'))
-        self.model_name = config('GEMINI_MODEL_NAME', default='gemini-2.5-flash')
-  
-    
+class GeminiService(BaseAIService):
+
+    def __init__(self, api_key: str | None = None, model: str | None = None):
+        key = api_key or config('GEMINI_API_KEY', default=None)
+        if not key:
+            raise ValueError("Gemini API key 未設定：請在個人設定填入 API key 或在伺服器 .env 設定 GEMINI_API_KEY")
+        self.client = genai.Client(api_key=key)
+        self.model_name = model or config('GEMINI_MODEL_NAME', default='gemini-2.5-flash')
+
     def _call_api(self, prompt: str) -> str:
-        """統一 API 呼叫方法，方便未來如果要換模型或調整參數，只需要修改這裡"""
         response = self.client.models.generate_content(
             model=self.model_name,
             contents=prompt,
@@ -28,9 +27,8 @@ class GeminiService(BaseAIService):
             )
         )
         return response.text
-    
+
     def _do_call_vision_api(self, image_data: bytes, mime_type: str) -> str:
-        """Gemini Vision: 原始 bytes 直接透過 Part 物件傳送"""
         response = self.client.models.generate_content(
             model=self.model_name,
             contents=[
@@ -43,16 +41,13 @@ class GeminiService(BaseAIService):
             )
         )
         return response.text
-       
-    
+
     def analyze_food_nutrition(self, food_name: str, portion_description: str = '') -> NutritionAnalysisResult:
         prompt = self._build_nutrition_prompt(food_name, portion_description)
-        
         try:
             logger.info(f"Gemini 分析食物營養: {food_name}")
             raw_text = self._call_api(prompt)
-            parsed = json.loads(raw_text)
-
+            parsed = json.loads(self._clean_json_response(raw_text))
             return NutritionAnalysisResult(
                 calories=float(parsed.get('calories', 0)),
                 protein=float(parsed.get('protein', 0)),
@@ -74,12 +69,10 @@ class GeminiService(BaseAIService):
 
     def give_dietary_advice(self, diary_entry_data: dict, user_profile: dict, daily_needs: dict) -> DietaryAdviceResult:
         prompt = self._build_advice_prompt(diary_entry_data, user_profile, daily_needs)
-
         try:
-            logger.info(f"Gemini 給予飲食建議")
+            logger.info("Gemini 給予飲食建議")
             raw_text = self._call_api(prompt)
-            parsed = json.loads(raw_text)
-
+            parsed = json.loads(self._clean_json_response(raw_text))
             return DietaryAdviceResult(
                 summary=parsed.get('summary', ''),
                 exceeded_nutrients=parsed.get('exceeded_nutrients', []),
@@ -94,4 +87,3 @@ class GeminiService(BaseAIService):
         except Exception as e:
             logger.error(f"Gemini API 呼叫失敗: {e}")
             raise
-    

@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
 from diary.models import DiaryEntry
+from diary.dto import DiaryNutritionDTO
 from ai_analysis.models import AIAnalysis
 from ai_analysis.services import get_ai_service
 
@@ -38,11 +39,15 @@ class AIAnalysisService:
 
         # 組裝資料(業務邏輯)
         diary_data = self._build_diary_data(diary_entry)
-        user_profile = self._build_user_profile(diary_entry.user)
+        user_profile = diary_entry.user.to_ai_profile()
         daily_needs = diary_entry.user.daily_nutrition_needs or {}
 
-        # 呼叫 AI
-        service = get_ai_service(provider)
+        # 呼叫 AI（使用使用者自帶 key，無則 fallback 到伺服器 .env）
+        service = get_ai_service(
+            provider=provider,
+            api_key=diary_entry.user.get_api_key(provider),
+            model=diary_entry.user.get_preferred_model(provider),
+        )
         result = service.give_dietary_advice(diary_data, user_profile, daily_needs)
 
         # 儲存結果
@@ -56,7 +61,7 @@ class AIAnalysisService:
             exceeded_nutrients=result.exceeded_nutrients,
             lacking_nutrients=result.lacking_nutrients,
             nutrition_score=result.nutrition_score,
-            status=AIAnalysis.StatusChoices.COMPLETED,
+            status=DiaryEntry.StatusChoices.COMPLETED,
             ai_model_used=f"{provider}:{service.model_name}",
         )
 
@@ -71,40 +76,18 @@ class AIAnalysisService:
         """
 
         if diary_entry.status == DiaryEntry.StatusChoices.PENDING:
-            raise DiaryNotReadyError("營養成分分析尚未完成，請燒等")
-        
+            raise DiaryNotReadyError("營養成分分析尚未完成，請稍等")
+
+        if diary_entry.status == DiaryEntry.StatusChoices.PROCESSING:
+            raise DiaryNotReadyError("目前正在分析中，請稍後再試")
+
         if diary_entry.status == DiaryEntry.StatusChoices.FAILED:
             raise DiaryNotReadyError("日誌的營養成分分析失敗，無法給予建議")
         
     def _build_diary_data(self, diary_entry: DiaryEntry) -> dict:
         """整理需要給AI的資料"""
-
-        return {
-            'food_name': diary_entry.food_name,
-            'portion_description': diary_entry.portion_description,
-            'meal_type': diary_entry.get_meal_type_display(),
-            'calories': float(diary_entry.calories or 0),
-            'protein': float(diary_entry.protein or 0),
-            'fat': float(diary_entry.fat or 0),
-            'saturated_fat': float(diary_entry.saturated_fat or 0),
-            'trans_fat': float(diary_entry.trans_fat or 0),
-            'carbohydrates': float(diary_entry.carbohydrates or 0),
-            'sugar': float(diary_entry.sugar or 0),
-            'sodium': float(diary_entry.sodium or 0),
-        }
+        return DiaryNutritionDTO.from_entry(diary_entry).to_dict()
     
-    def _build_user_profile(self, user) -> dict:
-        """整理使用者的資料給AI"""
-
-        return {
-            'gender': user.get_gender_display() if user.gender else '未提供',
-            'age': user.age,
-            'height': float(user.height) if user.height else None,
-            'weight': float(user.weight) if user.weight else None,
-            'bmi': user.bmi,
-            'goal': user.get_goal_display(),
-        }
-
 class DiaryNotReadyError(Exception):
     pass
 

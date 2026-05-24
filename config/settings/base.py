@@ -17,12 +17,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-
     # 第三方套件
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'drf_spectacular',
+    'pgvector.django',
 
     # 自己的套件
     'users',
@@ -161,11 +161,37 @@ CELERY_TASK_TIME_LIMIT = 130
 
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+        'BACKEND': 'django_redis.cache.RedisCache',
         'LOCATION': config('REDIS_URL', default='redis://localhost:6379/1'),
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'IGNORE_EXCEPTIONS': True,  # Redis 掛掉的話到 L2，不要直接500
+            'SOCKET_CONNECT_TIMEOUT': 2,
+            'SOCKET_TIMEOUT': 2,
         },
         'TIMEOUT': 60 * 60,  # 1 小時預設
+        'KEY_PREFIX': 'diet_ai', # 共用 Redis 時避免衝突
     }
+}
+
+DJANGO_REDIS_IGNORE_EXCEPTIONS = True  # Redis 連線失敗時，忽略錯誤，避免Django整個壞了
+
+# 欄位加密金鑰（EncryptedCharField 使用）
+# 生成指令：python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default='')
+
+# ── 台灣 FDA 食品成分資料 ──────────────────────────────────────────────────────
+# TAIWAN_FDA_SYNC_ENABLED=True 啟用 Celery Beat 自動同步；False 只能手動執行
+TAIWAN_FDA_SYNC_ENABLED = config('TAIWAN_FDA_SYNC_ENABLED', default=False, cast=bool)
+# 自動下載用的 CSV URL（留空則 Beat task 不下載，只有手動指令搭配 --file 使用）
+TAIWAN_FDA_CSV_URL = config('TAIWAN_FDA_CSV_URL', default='')
+
+# ── Celery Beat 定時任務 ───────────────────────────────────────────────────────
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'sync-taiwan-fda': {
+        'task': 'nutrition.tasks.sync_taiwan_fda_task',
+        'schedule': crontab(hour=3, minute=0),  # 每天凌晨 3 點
+    },
 }
