@@ -51,7 +51,7 @@ class DiaryEntry(models.Model):
     class Meta:
         db_table = 'diary_entries'
         verbose_name = '飲食日記'
-        ordering = ['user', '-date', '-meal_type'] # 預設排序:使用者 + 日期(新到舊) + 餐別(早餐->點心)
+        ordering = ['user', '-date', '-meal_type', '-id'] # 預設排序 + -id tie-breaker（同使用者同日同餐別時順序才穩定）
 
     def __str__(self):
         return f"{self.user.username} - {self.date} - {self.get_meal_type_display()}"

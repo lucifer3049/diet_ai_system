@@ -6,6 +6,28 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
+# 單筆食物（每份）的營養值合理上限。AI 偶爾會回出 999999 或負數，
+# 這些越界值若直接入庫會污染統計與後續建議，所以在解析時就 clamp 掉。
+NUTRITION_BOUNDS = {
+    'calories': 10000,
+    'protein': 1000,
+    'fat': 1000,
+    'saturated_fat': 1000,
+    'trans_fat': 1000,
+    'carbohydrates': 2000,
+    'sugar': 2000,
+    'sodium': 100000,  # mg
+}
+
+
+def clamp_nutrition(field: str, value: float) -> float:
+    """把營養值限制在 [0, 上限]。越界時記 warning 並回傳修正值。"""
+    upper = NUTRITION_BOUNDS.get(field, float('inf'))
+    clamped = min(max(value, 0.0), upper)
+    if clamped != value:
+        logger.warning(f"AI 營養值越界，已修正：{field}={value} → {clamped}")
+    return clamped
+
 @dataclass
 class NutritionAnalysisResult:
     """AI 分析食物營養結果"""
@@ -59,14 +81,10 @@ class BaseAIService(ABC):
 
     @abstractmethod
     def _call_api(self, prompt:str) -> str:
-        """
-        
-        """
         pass
 
     @abstractmethod
     def _do_call_vision_api(self, image_data: bytes, mime_type: set) -> str:
-        """"""
         pass
 
     @abstractmethod
@@ -119,15 +137,14 @@ class BaseAIService(ABC):
             FoodComponent(
                 name=c.get('name', '未知食物'),
                 portion_description=c.get('portion_description', ''),
-                calories=float(c.get('calories', 0)),
-                protein=float(c.get('protein', 0)),
-                fat=float(c.get('fat', 0)),
-                saturated_fat=float(c.get('saturated_fat', 0)), 
-                trans_fat=float(c.get('trans_fat', 0)),
-                carbohydrates=float(c.get('carbohydrates', 0)),
-                sugar=float(c.get('sugar', 0)),
-                sodium=float(c.get('sodium', 0)),
-
+                calories=clamp_nutrition('calories', float(c.get('calories', 0))),
+                protein=clamp_nutrition('protein', float(c.get('protein', 0))),
+                fat=clamp_nutrition('fat', float(c.get('fat', 0))),
+                saturated_fat=clamp_nutrition('saturated_fat', float(c.get('saturated_fat', 0))),
+                trans_fat=clamp_nutrition('trans_fat', float(c.get('trans_fat', 0))),
+                carbohydrates=clamp_nutrition('carbohydrates', float(c.get('carbohydrates', 0))),
+                sugar=clamp_nutrition('sugar', float(c.get('sugar', 0))),
+                sodium=clamp_nutrition('sodium', float(c.get('sodium', 0))),
             )
             for c in parsed.get('components', [])
         ]

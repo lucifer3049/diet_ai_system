@@ -88,8 +88,12 @@ class MyAnalysisListView(APIView):
         responses={200: AIAnalysisSerializer(many=True)}
     )
     def get(self, request):
+        # 以 -id 當 tie-breaker：created_at 並列時（同一微秒，Windows 時鐘粒度粗時常見）
+        # 仍有穩定且正確的順序，避免列表/分頁順序不確定。
         analyses = (
-            AIAnalysis.objects.filter(user=request.user).select_related('diary_entry').order_by('-created_at')
+            AIAnalysis.objects.filter(user=request.user)
+            .select_related('diary_entry')
+            .order_by('-created_at', '-id')
         )
         
         return Response(AIAnalysisSerializer(analyses, many=True).data)

@@ -5,12 +5,15 @@ from .services import DiaryService
 
 logger = logging.getLogger(__name__)
 
-@shared_task(
-    bind=True,
-    max_retries=2,
-    default_retry_delay=60,
-)
-def analyze_diary_entry_task(self, diary_entry_id: int):
+
+# 注意：這兩個 task「不自動 retry」。
+# 暫時性錯誤（OpenAI 503 / timeout / rate limit）已在 AI 呼叫層用 tenacity 就地重試；
+# 走到這裡的失敗代表永久性錯誤或 tenacity 已用盡 → 標記 FAILED，由使用者手動觸發重分析。
+# 因此不需要 bind=True / max_retries（之前那組設定沒有 self.retry 配合，其實從未生效）。
+
+
+@shared_task
+def analyze_diary_entry_task(diary_entry_id: int):
     """
     執行AI分析
 
@@ -20,21 +23,15 @@ def analyze_diary_entry_task(self, diary_entry_id: int):
     """
     logger.info(f"開始分析日記，diary_id={diary_entry_id}")
 
+    # 原子搶占 PENDING→PROCESSING。False = 別的 worker 搶先（或 id 不存在）→ 安全跳過。
+    if not DiaryService.begin_processing(diary_entry_id):
+        logger.info(f"跳過分析(已被處理或不存在)，diary_id={diary_entry_id}")
+        return
+
     try:
         diary_entry = DiaryEntry.objects.select_related('user').get(id=diary_entry_id)
-
-        if diary_entry.status != DiaryEntry.StatusChoices.PENDING:
-            logger.info(f"跳過分析，狀態={diary_entry.status}，diary_id={diary_entry_id}")
-            return
-
-        diary_entry.status = DiaryEntry.StatusChoices.PROCESSING
-        diary_entry.save(update_fields=['status'])
-
         DiaryService.analyze_diary_entry(diary_entry)
         logger.info(f"分析完成，diary_id={diary_entry_id}")
-
-    except DiaryEntry.DoesNotExist:
-        logger.error(f"找不到日記，diary_id={diary_entry_id}")
     except Exception as exc:
         logger.error(f"分析失敗，diary_id={diary_entry_id}，錯誤:{exc}")
         DiaryEntry.objects.filter(id=diary_entry_id).update(
@@ -43,12 +40,8 @@ def analyze_diary_entry_task(self, diary_entry_id: int):
         raise
 
 
-@shared_task(
-    bind=True,
-    max_retries=2,
-    default_retry_delay=60,
-)
-def analyze_diary_image_task(self, diary_entry_id: int):
+@shared_task
+def analyze_diary_image_task(diary_entry_id: int):
     """
     圖片辨識 task，與文字分析 task 分開的原因:
     1. 不同的 retry 策略
@@ -57,21 +50,14 @@ def analyze_diary_image_task(self, diary_entry_id: int):
     """
     logger.info(f"開始圖片辨識，diary_id={diary_entry_id}")
 
+    if not DiaryService.begin_processing(diary_entry_id):
+        logger.info(f"圖片辨識跳過(已被處理或不存在)，diary_id={diary_entry_id}")
+        return
+
     try:
         diary_entry = DiaryEntry.objects.select_related('user').get(id=diary_entry_id)
-
-        if diary_entry.status != DiaryEntry.StatusChoices.PENDING:
-            logger.info(f"圖片辨識跳過，狀態={diary_entry.status}，diary_id={diary_entry_id}")
-            return
-
-        diary_entry.status = DiaryEntry.StatusChoices.PROCESSING
-        diary_entry.save(update_fields=['status'])
-
         DiaryService.analyze_diary_image(diary_entry)
         logger.info(f"圖片辨識完成，diary_id={diary_entry_id}")
-
-    except DiaryEntry.DoesNotExist:
-        logger.error(f"找不到日記，diary_id={diary_entry_id}")
     except Exception as exc:
         logger.error(f"圖片辨識失敗，diary_id={diary_entry_id}，錯誤:{exc}")
         DiaryEntry.objects.filter(id=diary_entry_id).update(

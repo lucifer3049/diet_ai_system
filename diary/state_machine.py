@@ -38,3 +38,9 @@ class IllegalStatusTransition(Exception):
         self.from_status = from_status
         self.to_status = to_status
         super().__init__(f"DiaryEntry 狀態機違規：不允許從 {from_status!r} 轉換至 {to_status!r}")
+
+
+def assert_legal_transition(from_status: str, to_status: str) -> None:
+    """守衛：非法轉換直接丟 IllegalStatusTransition。仍是純函數，不打 DB。"""
+    if not is_legal_transition(from_status, to_status):
+        raise IllegalStatusTransition(from_status=from_status, to_status=to_status)
