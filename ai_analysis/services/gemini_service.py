@@ -2,10 +2,32 @@ import json
 import logging
 from google import genai
 from google.genai import types
+from google.genai.errors import ServerError
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 from decouple import config
-from .base import BaseAIService, NutritionAnalysisResult, DietaryAdviceResult
+from .base import (
+    BaseAIService,
+    NutritionAnalysisResult,
+    DietaryAdviceResult,
+    clamp_nutrition,
+)
 
 logger = logging.getLogger(__name__)
+
+# 只對 Gemini 5xx（ServerError）這種暫時性錯誤重試。
+# google-genai 沒有獨立的限流例外類別，429 會落在 ClientError；
+# 但 ClientError 也包含 400 等不該重試的錯，故這裡只認 ServerError，避免白費重試。
+_ai_retry = retry(
+    retry=retry_if_exception_type(ServerError),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
 
 
 class GeminiService(BaseAIService):
@@ -14,9 +36,14 @@ class GeminiService(BaseAIService):
         key = api_key or config('GEMINI_API_KEY', default=None)
         if not key:
             raise ValueError("Gemini API key 未設定：請在個人設定填入 API key 或在伺服器 .env 設定 GEMINI_API_KEY")
-        self.client = genai.Client(api_key=key)
+        # timeout 以毫秒為單位（30000ms = 30s），避免單次呼叫卡住整個 Celery task。
+        self.client = genai.Client(
+            api_key=key,
+            http_options=types.HttpOptions(timeout=30000),
+        )
         self.model_name = model or config('GEMINI_MODEL_NAME', default='gemini-2.5-flash')
 
+    @_ai_retry
     def _call_api(self, prompt: str) -> str:
         response = self.client.models.generate_content(
             model=self.model_name,
@@ -28,6 +55,7 @@ class GeminiService(BaseAIService):
         )
         return response.text
 
+    @_ai_retry
     def _do_call_vision_api(self, image_data: bytes, mime_type: str) -> str:
         response = self.client.models.generate_content(
             model=self.model_name,
@@ -49,14 +77,14 @@ class GeminiService(BaseAIService):
             raw_text = self._call_api(prompt)
             parsed = json.loads(self._clean_json_response(raw_text))
             return NutritionAnalysisResult(
-                calories=float(parsed.get('calories', 0)),
-                protein=float(parsed.get('protein', 0)),
-                fat=float(parsed.get('fat', 0)),
-                saturated_fat=float(parsed.get('saturated_fat', 0)),
-                trans_fat=float(parsed.get('trans_fat', 0)),
-                carbohydrates=float(parsed.get('carbohydrates', 0)),
-                sugar=float(parsed.get('sugar', 0)),
-                sodium=float(parsed.get('sodium', 0)),
+                calories=clamp_nutrition('calories', float(parsed.get('calories', 0))),
+                protein=clamp_nutrition('protein', float(parsed.get('protein', 0))),
+                fat=clamp_nutrition('fat', float(parsed.get('fat', 0))),
+                saturated_fat=clamp_nutrition('saturated_fat', float(parsed.get('saturated_fat', 0))),
+                trans_fat=clamp_nutrition('trans_fat', float(parsed.get('trans_fat', 0))),
+                carbohydrates=clamp_nutrition('carbohydrates', float(parsed.get('carbohydrates', 0))),
+                sugar=clamp_nutrition('sugar', float(parsed.get('sugar', 0))),
+                sodium=clamp_nutrition('sodium', float(parsed.get('sodium', 0))),
                 food_description=parsed.get('food_description', ''),
                 raw_response=raw_text
             )

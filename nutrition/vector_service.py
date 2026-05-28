@@ -45,7 +45,7 @@ class FoodVectorService:
         try:
             embedding = self._embed(food_name)
         except Exception as e:
-            logger.warning(f"向量生成失敗，跳過 L2.5：{e}")
+            logger.warning(f"向量生成失敗，跳過 L2.5:{e}")
             return None
 
         try:
@@ -54,7 +54,7 @@ class FoodVectorService:
                 .exclude(embedding=None)
                 .annotate(distance=CosineDistance('embedding', embedding))
                 .filter(distance__lt=COSINE_DISTANCE_THRESHOLD)
-                .order_by('distance')
+                .order_by('distance', 'id')  # id 當 tie-breaker：距離相等時結果穩定
                 .first()
             )
             if result:
@@ -65,7 +65,7 @@ class FoodVectorService:
                 )
             return result
         except Exception as e:
-            logger.warning(f"向量搜尋失敗，跳過 L2.5：{e}")
+            logger.warning(f"向量搜尋失敗，跳過 L2.5:{e}")
             return None
 
     def store_embedding(self, cache_obj: 'FoodNutritionCache') -> None:
@@ -76,7 +76,7 @@ class FoodVectorService:
             cache_obj.save(update_fields=['embedding'])
             logger.debug(f"Embedding 已儲存：{cache_obj.food_name}")
         except Exception as e:
-            logger.warning(f"Embedding 儲存失敗（{cache_obj.food_name}）：{e}")
+            logger.warning(f"Embedding 儲存失敗（{cache_obj.food_name}):{e}")
 
     # ── 內部方法 ─────────────────────────────────────────────────────────────────
 
@@ -100,5 +100,5 @@ def try_vector_search(food_name: str) -> 'FoodNutritionCache | None':
         # OPENAI_API_KEY 未設定
         return None
     except Exception as e:
-        logger.warning(f"L2.5 向量搜尋例外，跳過：{e}")
+        logger.warning(f"L2.5 向量搜尋例外，跳過:{e}")
         return None

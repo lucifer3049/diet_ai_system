@@ -1,9 +1,11 @@
 import pytest
 import json
+import httpx
 from unittest.mock import patch, MagicMock
+from openai import APITimeoutError
 from ai_analysis.services.openai_service import OpenAIService
 from ai_analysis.services.gemini_service import GeminiService
-from ai_analysis.services.base import NutritionAnalysisResult
+from ai_analysis.services.base import NutritionAnalysisResult, clamp_nutrition
 
 
 class TestOpenAIServiceNutritionAnalysis:
@@ -70,6 +72,79 @@ class TestOpenAIServiceNutritionAnalysis:
             call_args = mock_api.call_args[0][0]
             assert "牛肉麵" in call_args
             assert "大碗" in call_args
+
+
+class TestNutritionClamp:
+    """clamp_nutrition：把 AI 越界的營養值修正到合理範圍。"""
+
+    def test_negative_clamped_to_zero(self):
+        assert clamp_nutrition('calories', -50.0) == 0.0
+
+    def test_over_upper_bound_clamped(self):
+        # calories 上限 10000
+        assert clamp_nutrition('calories', 999999.0) == 10000.0
+
+    def test_normal_value_unchanged(self):
+        assert clamp_nutrition('protein', 30.0) == 30.0
+
+    def test_clamp_applied_in_analysis(self):
+        """解析 AI 回應時，越界值應被 clamp，不會原樣進入結果。"""
+        with patch('ai_analysis.services.openai_service.OpenAI'):
+            svc = OpenAIService()
+        mock_response = json.dumps({'calories': -10, 'protein': 999999})
+        with patch.object(svc, '_call_api', return_value=mock_response):
+            result = svc.analyze_food_nutrition('怪食物')
+        assert result.calories == 0.0          # 負值 → 0
+        assert result.protein == 1000.0        # 超過 protein 上限 1000
+
+
+class TestOpenAIServiceRetry:
+    """tenacity：暫時性錯誤重試、永久性錯誤不重試。"""
+
+    @pytest.fixture
+    def service(self):
+        with patch('ai_analysis.services.openai_service.OpenAI'):
+            svc = OpenAIService()
+            svc.model_name = 'gpt-4o-mini'
+            return svc
+
+    @staticmethod
+    def _timeout_error():
+        return APITimeoutError(request=httpx.Request('POST', 'http://test'))
+
+    @staticmethod
+    def _ok_response(content='{}'):
+        resp = MagicMock()
+        resp.choices[0].message.content = content
+        return resp
+
+    def test_retries_transient_then_succeeds(self, service):
+        """逾時兩次後第三次成功 → _call_api 回傳結果，共呼叫 3 次。"""
+        service.client.chat.completions.create.side_effect = [
+            self._timeout_error(),
+            self._timeout_error(),
+            self._ok_response('{"ok": true}'),
+        ]
+        with patch('time.sleep'):  # 跳過 tenacity 的退避等待，加速測試
+            result = service._call_api('prompt')
+        assert result == '{"ok": true}'
+        assert service.client.chat.completions.create.call_count == 3
+
+    def test_gives_up_after_max_attempts(self, service):
+        """一直逾時 → 試滿 3 次後原樣拋出 APITimeoutError。"""
+        service.client.chat.completions.create.side_effect = self._timeout_error()
+        with patch('time.sleep'):
+            with pytest.raises(APITimeoutError):
+                service._call_api('prompt')
+        assert service.client.chat.completions.create.call_count == 3
+
+    def test_non_transient_not_retried(self, service):
+        """非暫時性錯誤（如 ValueError）不重試，呼叫一次即拋出。"""
+        service.client.chat.completions.create.side_effect = ValueError('boom')
+        with patch('time.sleep'):
+            with pytest.raises(ValueError):
+                service._call_api('prompt')
+        assert service.client.chat.completions.create.call_count == 1
 
 
 class TestAIServiceFactory:

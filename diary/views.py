@@ -24,7 +24,7 @@ class DiaryEntryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return (
-            DiaryEntry.objects.filter(user=self.request.user).prefetch_related('components').select_related('ai_analysis').order_by('-date', '-created_at')
+            DiaryEntry.objects.filter(user=self.request.user).prefetch_related('components').select_related('ai_analysis').order_by('-date', '-created_at','-id')
         )
     
     def perform_create(self, serializer):

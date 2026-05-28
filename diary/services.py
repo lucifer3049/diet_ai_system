@@ -7,9 +7,11 @@ from ai_analysis.models import AIAnalysis
 from ai_analysis.services import get_ai_service
 from ai_analysis.services.base import NutritionAnalysisResult, ImageAnalysisResult
 from nutrition.cache import get_cached_nutrition, set_cached_nutrition
+from .state_machine import assert_legal_transition
 from dataclasses import asdict
 from decimal import Decimal
 from django.db import transaction
+from django.db.models import F
 
 
 logger = logging.getLogger(__name__)
@@ -24,6 +26,22 @@ class DiaryService:
     飲食日記邏輯
     View 只需要呼叫這裡，這裡負責處理業務邏輯
     """
+
+    @staticmethod
+    def begin_processing(diary_entry_id: int) -> bool:
+        """
+        原子搶占：只有成功把 PENDING → PROCESSING 的 worker 回傳 True。
+
+        為什麼用 filter().update() 而不是 get() 後判斷再 save()？
+        後者是 check-then-act，兩個 worker 可能同時讀到 PENDING、各自往下跑，
+        AI 被打兩次、錢花兩次。filter().update() 是 DB 端單一原子操作
+        （UPDATE ... WHERE status='pending'），只有一個 worker 能把那一列改掉，
+        回傳的 rowcount 就是「我有沒有搶到」。id 不存在時也回傳 0。
+        """
+        return DiaryEntry.objects.filter(
+            id=diary_entry_id,
+            status=DiaryEntry.StatusChoices.PENDING,
+        ).update(status=DiaryEntry.StatusChoices.PROCESSING) > 0
 
     @staticmethod
     def get_nutrition_from_cache_or_ai(
@@ -57,7 +75,7 @@ class DiaryService:
             logger.info(f"DB cache hit: {normalized_name}")
 
             FoodNutritionCache.objects.filter(id=db_cached.id).update(
-                hit_count=db_cached.hit_count + 1
+                hit_count=F('hit_count') + 1
             )
 
             result = NutritionAnalysisResult(
@@ -135,11 +153,15 @@ class DiaryService:
         return nutrition_result
 
     @staticmethod
-    def save_nutrition_to_diary(
+    def _apply_nutrition(
         diary_entry: DiaryEntry,
         nutrition_result: NutritionAnalysisResult
     ) -> None:
-        """把AI回傳結果存到資料庫，只更新營養欄位"""
+        """
+        把 AI 回傳的營養值套到記憶體中的 entry，並把狀態推進到 COMPLETED。
+        不寫 DB —— 讓呼叫端決定何時、在哪個 transaction 內存檔。
+        """
+        assert_legal_transition(diary_entry.status, DiaryEntry.StatusChoices.COMPLETED)
         diary_entry.calories = nutrition_result.calories
         diary_entry.protein = nutrition_result.protein
         diary_entry.fat = nutrition_result.fat
@@ -149,6 +171,14 @@ class DiaryService:
         diary_entry.sugar = nutrition_result.sugar
         diary_entry.sodium = nutrition_result.sodium
         diary_entry.status = DiaryEntry.StatusChoices.COMPLETED
+
+    @staticmethod
+    def save_nutrition_to_diary(
+        diary_entry: DiaryEntry,
+        nutrition_result: NutritionAnalysisResult
+    ) -> None:
+        """把AI回傳結果存到資料庫，只更新營養欄位"""
+        DiaryService._apply_nutrition(diary_entry, nutrition_result)
         diary_entry.save(update_fields=_NUTRITION_UPDATE_FIELDS)
 
     @staticmethod
@@ -189,30 +219,35 @@ class DiaryService:
             service=service,
         )
 
-        # 存回日記資料庫
-        cls.save_nutrition_to_diary(diary_entry, nutrition_result)
+        # 把營養值套到記憶體中的 entry（給 build_diary_data 用），先不寫 DB
+        cls._apply_nutrition(diary_entry, nutrition_result)
 
-        # 取得飲食建議
+        # 組要給 AI 的資料
         diary_data = cls.build_diary_data(diary_entry)
         user_profile = cls.build_user_profile(user)
         daily_needs = user.daily_nutrition_needs or {}
 
+        # 外部 AI 呼叫：務必在 transaction 之外。
+        # 否則一筆 DB 交易會被這個 2~3 秒的 API 卡住，佔住連線、延長鎖的持有時間。
         advice_result = service.give_dietary_advice(diary_data, user_profile, daily_needs)
 
-        # 存入AI分析結果
-        AIAnalysis.objects.create(
-            user=user,
-            diary_entry=diary_entry,
-            prompt_sent=f"食物分析：{food_name}",
-            raw_response=advice_result.raw_response,
-            summary=advice_result.summary,
-            suggestions=advice_result.next_meal_suggestions,
-            exceeded_nutrients=advice_result.exceeded_nutrients,
-            lacking_nutrients=advice_result.lacking_nutrients,
-            nutrition_score=advice_result.nutrition_score,
-            status=DiaryEntry.StatusChoices.COMPLETED,
-            ai_model_used=f"{provider}:{service.model_name}",
-        )
+        # 兩個 DB 寫入綁進同一個 transaction：要嘛 entry 存檔 + AIAnalysis 都成功，
+        # 要嘛一起 rollback。避免「entry 已 COMPLETED 但 AIAnalysis 沒建」的部分失敗。
+        with transaction.atomic():
+            diary_entry.save(update_fields=_NUTRITION_UPDATE_FIELDS)
+            AIAnalysis.objects.create(
+                user=user,
+                diary_entry=diary_entry,
+                prompt_sent=f"食物分析：{food_name}",
+                raw_response=advice_result.raw_response,
+                summary=advice_result.summary,
+                suggestions=advice_result.next_meal_suggestions,
+                exceeded_nutrients=advice_result.exceeded_nutrients,
+                lacking_nutrients=advice_result.lacking_nutrients,
+                nutrition_score=advice_result.nutrition_score,
+                status=DiaryEntry.StatusChoices.COMPLETED,
+                ai_model_used=f"{provider}:{service.model_name}",
+            )
 
     @classmethod
     def analyze_diary_image(cls, diary_entry: DiaryEntry) -> None:
@@ -292,6 +327,7 @@ class DiaryService:
         image_result: ImageAnalysisResult,
     ) -> None:
         """將所有 components 的營養成份加總，填入 DiaryEntry"""
+        assert_legal_transition(diary_entry.status, DiaryEntry.StatusChoices.COMPLETED)
         def _sum(field: str) -> Decimal:
             return Decimal(str(sum(getattr(c, field, 0) for c in image_result.components)))
 

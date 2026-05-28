@@ -115,10 +115,35 @@ class TestGetNutritionFromCacheOrAI:
 
 
 @pytest.mark.django_db
+class TestBeginProcessing:
+    """begin_processing：原子搶占 PENDING→PROCESSING，防止重複分析。"""
+
+    def test_claims_pending_entry(self, user):
+        diary = DiaryEntryFactory(user=user)  # 預設 PENDING
+        assert DiaryService.begin_processing(diary.id) is True
+        diary.refresh_from_db()
+        assert diary.status == DiaryEntry.StatusChoices.PROCESSING
+
+    def test_second_claim_loses_race(self, user):
+        """模擬兩個 worker：第一次搶到 True，第二次拿到 False（已是 PROCESSING）。"""
+        diary = DiaryEntryFactory(user=user)
+        assert DiaryService.begin_processing(diary.id) is True
+        assert DiaryService.begin_processing(diary.id) is False
+
+    def test_nonexistent_id_returns_false(self):
+        assert DiaryService.begin_processing(999999) is False
+
+    def test_completed_entry_cannot_be_claimed(self, user):
+        diary = DiaryEntryFactory(user=user, completed=True)
+        assert DiaryService.begin_processing(diary.id) is False
+
+
+@pytest.mark.django_db
 class TestSaveNutritionToDiary:
 
     def test_saves_all_nutrition_fields(self, user):
-        diary = DiaryEntryFactory(user=user)
+        # PROCESSING → COMPLETED 才是合法轉換（task 會先 begin_processing）
+        diary = DiaryEntryFactory(user=user, processing=True)
         nutrition = make_mock_nutrition()
 
         DiaryService.save_nutrition_to_diary(diary, nutrition)
@@ -130,7 +155,7 @@ class TestSaveNutritionToDiary:
         assert float(diary.sodium) == 800.0
 
     def test_sets_status_to_completed(self, user):
-        diary = DiaryEntryFactory(user=user)
+        diary = DiaryEntryFactory(user=user, processing=True)
         DiaryService.save_nutrition_to_diary(diary, make_mock_nutrition())
 
         diary.refresh_from_db()
@@ -154,7 +179,7 @@ class TestAnalyzeDiaryEntry:
 
     def test_creates_ai_analysis_record(self, user, mock_ai_service):
         """完整分析後應建立 AIAnalysis 紀錄"""
-        diary = DiaryEntryFactory(user=user, food_name='雞腿便當')
+        diary = DiaryEntryFactory(user=user, food_name='雞腿便當', processing=True)
 
         with patch('diary.services.get_ai_service', return_value=mock_ai_service):
             DiaryService.analyze_diary_entry(diary)
@@ -162,7 +187,7 @@ class TestAnalyzeDiaryEntry:
         assert AIAnalysis.objects.filter(diary_entry=diary).exists()
 
     def test_ai_analysis_has_correct_data(self, user, mock_ai_service):
-        diary = DiaryEntryFactory(user=user, food_name='雞腿便當')
+        diary = DiaryEntryFactory(user=user, food_name='雞腿便當', processing=True)
 
         with patch('diary.services.get_ai_service', return_value=mock_ai_service):
             DiaryService.analyze_diary_entry(diary)
@@ -174,7 +199,7 @@ class TestAnalyzeDiaryEntry:
 
     def test_diary_nutrition_filled_after_analysis(self, user, mock_ai_service):
         """分析後日記的營養素欄位應被填入"""
-        diary = DiaryEntryFactory(user=user, food_name='雞腿便當')
+        diary = DiaryEntryFactory(user=user, food_name='雞腿便當', processing=True)
 
         with patch('diary.services.get_ai_service', return_value=mock_ai_service):
             DiaryService.analyze_diary_entry(diary)
@@ -186,7 +211,7 @@ class TestAnalyzeDiaryEntry:
     def test_uses_food_cache_when_available(self, user, mock_ai_service):
         """有快取時，不應呼叫 AI 的 analyze_food_nutrition"""
         FoodNutritionCacheFactory(food_name='滷肉飯', calories=400)
-        diary = DiaryEntryFactory(user=user, food_name='滷肉飯')
+        diary = DiaryEntryFactory(user=user, food_name='滷肉飯', processing=True)
 
         with patch('diary.services.get_ai_service', return_value=mock_ai_service):
             DiaryService.analyze_diary_entry(diary)
@@ -204,7 +229,7 @@ class TestAnalyzeDiaryImage:
         """建立帶有假圖片的 DiaryEntry"""
         from django.core.files.base import ContentFile
 
-        diary = DiaryEntryFactory(user=user, food_name='便當')
+        diary = DiaryEntryFactory(user=user, food_name='便當', processing=True)
 
         tiny_jpeg = (
             b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00'

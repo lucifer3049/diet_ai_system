@@ -496,6 +496,9 @@ docker compose exec web python manage.py createsuperuser
 ### 常用指令
 
 ```bash
+# 進入容器
+docker exec -it diet-ai-web bash
+
 # 執行 migration
 docker compose exec web python manage.py migrate
 
@@ -522,6 +525,12 @@ python manage.py runserver --settings=config.settings.development
 
 # 另開終端啟動 Celery worker
 celery -A config worker --loglevel=info
+
+# 進入Django shell，可以測試ORM
+python manage.py shell
+
+# 離開venv
+deactivate
 ```
 
 ### 環境變數

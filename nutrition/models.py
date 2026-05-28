@@ -36,7 +36,7 @@ class Food(models.Model):
     class Meta:
         db_table = 'foods'
         verbose_name = '食物資料庫'
-        ordering = ['name'] # 排序:使用名稱排序
+        ordering = ['name', 'id'] # 名稱排序 + id tie-breaker（同名時順序才穩定）
 
     def __str__(self):
         return f"{self.name} ({self.calories_per_100g} kcal / 100g)"

@@ -1,11 +1,45 @@
 import json
 import logging
 import base64
-from openai import OpenAI
+from openai import (
+    OpenAI,
+    APITimeoutError,
+    RateLimitError,
+    APIConnectionError,
+    InternalServerError,
+)
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 from decouple import config
-from .base import BaseAIService, NutritionAnalysisResult, DietaryAdviceResult
+from .base import (
+    BaseAIService,
+    NutritionAnalysisResult,
+    DietaryAdviceResult,
+    clamp_nutrition,
+)
 
 logger = logging.getLogger(__name__)
+
+# 只對「暫時性」錯誤重試：逾時、連線中斷、被限流、OpenAI 5xx。
+# 4xx（如金鑰錯誤、請求格式錯）不重試，重試也只是白白再失敗一次。
+_TRANSIENT_ERRORS = (
+    APITimeoutError,
+    RateLimitError,
+    APIConnectionError,
+    InternalServerError,
+)
+
+# 指數退避：第 1 次失敗等 2s，再失敗等 4s…最多 10s，總共試 3 次後放棄並原樣拋出。
+_ai_retry = retry(
+    retry=retry_if_exception_type(_TRANSIENT_ERRORS),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
 
 
 class OpenAIService(BaseAIService):
@@ -14,9 +48,12 @@ class OpenAIService(BaseAIService):
         key = api_key or config('OPENAI_API_KEY', default=None)
         if not key:
             raise ValueError("OpenAI API key 未設定：請在個人設定填入 API key 或在伺服器 .env 設定 OPENAI_API_KEY")
-        self.client = OpenAI(api_key=key)
+        # timeout=30：單次呼叫最多等 30 秒，避免卡住整個 Celery task。
+        # max_retries=0：關掉 SDK 內建重試，改由下面的 tenacity 統一控制，避免雙重重試。
+        self.client = OpenAI(api_key=key, timeout=30.0, max_retries=0)
         self.model_name = model or config('OPENAI_MODEL', default='gpt-4o-mini')
 
+    @_ai_retry
     def _call_api(self, prompt: str) -> str:
         response = self.client.chat.completions.create(
             model=self.model_name,
@@ -36,6 +73,7 @@ class OpenAIService(BaseAIService):
         )
         return response.choices[0].message.content
 
+    @_ai_retry
     def _do_call_vision_api(self, image_data: bytes, mime_type: str) -> str:
         b64_image = base64.b64encode(image_data).decode('utf-8')
         response = self.client.chat.completions.create(
@@ -70,14 +108,14 @@ class OpenAIService(BaseAIService):
             raw_text = self._call_api(prompt)
             parsed = json.loads(self._clean_json_response(raw_text))
             return NutritionAnalysisResult(
-                calories=float(parsed.get('calories', 0)),
-                protein=float(parsed.get('protein', 0)),
-                fat=float(parsed.get('fat', 0)),
-                saturated_fat=float(parsed.get('saturated_fat', 0)),
-                trans_fat=float(parsed.get('trans_fat', 0)),
-                carbohydrates=float(parsed.get('carbohydrates', 0)),
-                sugar=float(parsed.get('sugar', 0)),
-                sodium=float(parsed.get('sodium', 0)),
+                calories=clamp_nutrition('calories', float(parsed.get('calories', 0))),
+                protein=clamp_nutrition('protein', float(parsed.get('protein', 0))),
+                fat=clamp_nutrition('fat', float(parsed.get('fat', 0))),
+                saturated_fat=clamp_nutrition('saturated_fat', float(parsed.get('saturated_fat', 0))),
+                trans_fat=clamp_nutrition('trans_fat', float(parsed.get('trans_fat', 0))),
+                carbohydrates=clamp_nutrition('carbohydrates', float(parsed.get('carbohydrates', 0))),
+                sugar=clamp_nutrition('sugar', float(parsed.get('sugar', 0))),
+                sodium=clamp_nutrition('sodium', float(parsed.get('sodium', 0))),
                 food_description=parsed.get('food_description', ''),
                 raw_response=raw_text
             )
